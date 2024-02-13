@@ -1,0 +1,18 @@
+const cases = [
+    "Basic MDP Configuration.",
+    "Basic MDP Configuration with Service Locations Filter.",
+    "[MODIFY PLAYER BASED ON DOCUMENTATION] CMCD data from player settings.",
+    "Multiple ServiceDescription elements.",
+    "Multiperiod MPD with ServiceDescription. - not work",
+    "Setting serviceLocations & includeInRequest filters (border case).",
+    "Setting includeInRequests only filter.",
+    "Setting serviceLocations & includeInRequests filters.",
+    "includeInRequest default value.",
+    "Keys are not defined.",
+    "Keys parameter has some invalid key.",
+    "Keys are defined but all the keys are not implemented.",
+    "IncludeInRequests is defined but has some invalid request type.",
+    "IncludeInRequests are defined but all the request types are not implemented."
+];
+
+module.exports = cases
