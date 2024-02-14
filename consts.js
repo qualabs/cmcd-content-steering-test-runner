@@ -3,7 +3,7 @@ const cases = [
     "Basic MDP Configuration with Service Locations Filter.",
     "[MODIFY PLAYER BASED ON DOCUMENTATION] CMCD data from player settings.",
     "Multiple ServiceDescription elements.",
-    "Multiperiod MPD with ServiceDescription. - not work",
+    "Multiperiod MPD with ServiceDescription. - NOT WORK",
     "Setting serviceLocations & includeInRequest filters (border case).",
     "Setting includeInRequests only filter.",
     "Setting serviceLocations & includeInRequests filters.",
