@@ -9,7 +9,7 @@ const port = 3003;
 app.use(cors());
 
 app.get('/cases/:id', function(req, res){
-  const id = req.params.id; 
+  const id = req.params.id.split('.')[0];
   console.log(`[EXECUTING] ${cases[id-1]}`);
   const file = `${__dirname}/cases/${id}.mpd`;
   if (fs.existsSync(file))
