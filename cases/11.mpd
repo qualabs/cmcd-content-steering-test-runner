@@ -6,7 +6,7 @@
   <ServiceDescription>
 	  <ContentSteering defaultServiceLocation="cdn-a" queryBeforeStart="true">https://cloudfront.content-steering.com/dash.dcsm?steering_params=eyJjZG5PcmRlciI6WyJjZG4tYSIsImNkbi1iIiwiY2RuLWMiXSwibWluQml0cmF0ZSI6OTE0ODc4LCJwYXRod2F5cyI6W3siaWQiOiJjZG4tYSIsInRocm91Z2hwdXQiOjIwMDAwMDAwfSx7ImlkIjoiY2RuLWIiLCJ0aHJvdWdocHV0IjoyMDAwMDAwMH0seyJpZCI6ImNkbi1jIiwidGhyb3VnaHB1dCI6MjAwMDAwMDB9XX0=</ContentSteering>
     <ClientDataReporting serviceLocations="cdn-a cdn-b cdn-c">
-      <CMCDParameters version="1" mode="query" includeInRequests="segment mdp steering" keys="br sid cid xx" contentID="1" sessionID="2" />
+      <CMCDParameters version="1" mode="query" includeInRequests="segment mpd steering" keys="br sid cid xx" contentID="1" sessionID="2" />
     </ClientDataReporting>
   </ServiceDescription>
   <Period>
