@@ -5,6 +5,12 @@
     <title>Content Steering</title>
 
     <script src="../dashjs-dist/dash.all.debug.js"></script>
+    <script type="module" src="./scripts/load-mpd-content.js"></script>
+    <script class="code" src="./scripts/content-steering.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/default.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
 
     <!-- Bootstrap core CSS -->
     <link href="./lib/bootstrap/bootstrap.min.css" rel="stylesheet">
@@ -20,6 +26,11 @@
             height: 500px;
             margin-top: 20px;
             font-size: 10px;
+        }
+
+        .input-group {
+            align-items: center;
+            gap: 4px;
         }
 
         figure.cdn-selection {
@@ -38,178 +49,13 @@
         #cdn-selection-container, #location-selection-container {
             margin: 30px 0 0 0;
         }
+
+        #trace {
+            height: 500px;
+            margin-top: 20px;
+            font-size: 10px;
+        }
     </style>
-
-    <script class="code">
-        let player;
-        let mpd = "";
-        let currentSelectedServiceLocation = {}
-        let cdnSelectionImgDomElements = {};
-        let locationSelectionImgDomElements = {};
-
-        function init() {
-            player = dashjs.MediaPlayer().create();
-            document.getElementById('load-button').addEventListener('click', function () {
-                _load();
-            })
-            player.initialize(document.querySelector("video"), null, true);
-
-            player.on(dashjs.MediaPlayer.events.FRAGMENT_LOADING_STARTED, _onFragmentLoadingStarted, null);
-            player.on(dashjs.MediaPlayer.events.MANIFEST_LOADING_STARTED, _onManifestLoadingStarted, null);
-            player.on(dashjs.MediaPlayer.events.CONTENT_STEERING_REQUEST_COMPLETED, _onContentSteeringRequestCompleted, null);
-            player.on(dashjs.MediaPlayer.events.BASE_URLS_UPDATED, _onBaseUrlsUpdated, null);
-            player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, _onManifestLoaded, null);
-        }
-
-        function _load() {
-            mpd = document.getElementById('manifest').value;
-            player.attachSource(mpd);
-        }
-
-        function _onFragmentLoadingStarted(e) {
-            try {
-                if (e && e.mediaType && (e.mediaType === 'video' || e.mediaType === 'audio') && e.request) {
-                    if (e.request.serviceLocation) {
-                        const element = document.getElementById(`${e.mediaType}-service-location`);
-                        element.innerText = e.request.serviceLocation;
-                        if (!currentSelectedServiceLocation[e.mediaType] || currentSelectedServiceLocation[e.mediaType] !== e.request.serviceLocation) {
-                            currentSelectedServiceLocation[e.mediaType] = e.request.serviceLocation;
-                            _serviceLocationChanged(currentSelectedServiceLocation, cdnSelectionImgDomElements);
-                        }
-                    }
-                    if (e.request.url) {
-                        const element = document.getElementById(`${e.mediaType}-request-url`);
-                        element.innerText = e.request.url;
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        function _serviceLocationChanged(selectedServiceLocation, domElements) {
-            const activeServiceLocations = Object.keys(selectedServiceLocation).reduce((acc, key) => {
-                acc[selectedServiceLocation[key]] = true;
-                return acc;
-            }, {})
-
-            Object.keys(domElements).forEach((key) => {
-                const elem = domElements[key];
-
-                if (activeServiceLocations[key]) {
-                    elem.setAttribute('src', 'img/server-active.svg')
-                } else {
-                    elem.setAttribute('src', 'img/server.svg');
-                }
-
-            })
-        }
-
-        function _onBaseUrlsUpdated(e) {
-            if (!e || !e.baseUrls || e.baseUrls.length === 0) {
-                return;
-            }
-            const divContainer = document.getElementById('cdn-selection-container');
-            /* Only create the once we dont have yet */
-            e.baseUrls.forEach((baseUrl) => {
-                if (baseUrl.serviceLocation) {
-                    const existingElement = document.getElementById(`cdn-selection-${baseUrl.serviceLocation}`);
-                    if (!existingElement) {
-                        const spanContainer = document.createElement('span');
-                        spanContainer.setAttribute('id', `cdn-selection-${baseUrl.serviceLocation}`);
-                        const figure = document.createElement('figure');
-                        figure.setAttribute('class', 'cdn-selection');
-                        const img = document.createElement('img');
-                        img.setAttribute('src', 'img/server.svg');
-                        img.setAttribute('class', 'figure-img img-fluid cdn-selection');
-                        const figCaption = document.createElement('figcaption');
-                        figCaption.setAttribute('class', 'figure-caption');
-                        const label = document.createTextNode(`${baseUrl.serviceLocation}`);
-                        figCaption.appendChild(label);
-                        figure.appendChild(img)
-                        figure.appendChild(figCaption);
-                        spanContainer.appendChild(figure);
-                        divContainer.appendChild(spanContainer);
-                        cdnSelectionImgDomElements[baseUrl.serviceLocation] = img;
-                    }
-                }
-            })
-        }
-
-        function _onManifestLoaded() {
-            const locations = player.getAvailableLocations();
-            if (!locations || locations.length === 0) {
-                return;
-            }
-            const divContainer = document.getElementById('location-selection-container');
-            /* Only create the once we dont have yet */
-            locations.forEach((location) => {
-                if (location.serviceLocation) {
-                    const existingElement = document.getElementById(`cdn-selection-${location.serviceLocation}`);
-                    if (!existingElement) {
-                        const spanContainer = document.createElement('span');
-                        spanContainer.setAttribute('id', `cdn-selection-${location.serviceLocation}`);
-                        const figure = document.createElement('figure');
-                        figure.setAttribute('class', 'cdn-selection');
-                        const img = document.createElement('img');
-                        img.setAttribute('src', 'img/server.svg');
-                        img.setAttribute('class', 'figure-img img-fluid cdn-selection');
-                        const figCaption = document.createElement('figcaption');
-                        figCaption.setAttribute('class', 'figure-caption');
-                        const label = document.createTextNode(`${location.serviceLocation}`);
-                        figCaption.appendChild(label);
-                        figure.appendChild(img)
-                        figure.appendChild(figCaption);
-                        spanContainer.appendChild(figure);
-                        divContainer.appendChild(spanContainer);
-                        locationSelectionImgDomElements[location.serviceLocation] = img;
-                    }
-                }
-            })
-        }
-
-        function _onManifestLoadingStarted(e) {
-            try {
-                if (e.request.serviceLocation) {
-
-                }
-                if (e.request.url) {
-                    const element = document.getElementById(`manifest-request-url`);
-                    element.innerText = e.request.url;
-                }
-                const slElement = document.getElementById(`manifest-service-location`);
-                if (e.request.serviceLocation) {
-                    slElement.innerText = e.request.serviceLocation;
-                    _serviceLocationChanged({ manifest: e.request.serviceLocation }, locationSelectionImgDomElements)
-                } else {
-                    slElement.innerText = '';
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        function _onContentSteeringRequestCompleted(e) {
-            try {
-                if (e) {
-                    document.getElementById(`steering-request-timestamp`).innerText = new Date().toISOString();
-                    if (e.url) {
-                        document.getElementById(`steering-request-url`).innerText = decodeURIComponent(e.url);
-                    }
-                    if (e.currentSteeringResponseData) {
-                        document.getElementById(`steering-version`).innerText = e.currentSteeringResponseData.version;
-                        document.getElementById(`steering-ttl`).innerText = e.currentSteeringResponseData.ttl;
-                        document.getElementById(`steering-reload-uri`).innerText = e.currentSteeringResponseData.reloadUri;
-                        document.getElementById(`steering-pathway-priority`).innerText = e.currentSteeringResponseData.pathwayPriority.toString();
-                        document.getElementById(`steering-pathway-cloning`).innerText = JSON.stringify(e.currentSteeringResponseData.pathwayClones, null, '\t');
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-    </script>
 </head>
 <body>
 
@@ -217,7 +63,7 @@
     <div class="container py-4">
         <header class="pb-3 mb-4 border-bottom">
             <img class=""
-                 src="../lib/img/dashjs-logo.png"
+                 src="../samples/lib/img/dashjs-logo.png"
                  width="200">
         </header>
         <div class="row">
@@ -248,9 +94,29 @@
         <div class="row mt-4">
             <div class="col-md-12">
                 <div class="input-group mb-3">
-                    <input type="text" id="manifest" class="form-control" placeholder="MPD URL"
-                           value="https://www.content-steering.com/bbb/playlist_steering_cloudfront_https.mpd">
-                    <button type="button" id="load-button" class="btn btn-success">Load MPD
+                    <select id="manifest" class="form-control" placeholder="MPD URL">
+                        <option selected value="https://www.content-steering.com/bbb/playlist_steering_cloudfront_https.mpd">https://www.content-steering.com/bbb/playlist_steering_cloudfront_https.mpd</option>
+                        <option value="./cases/1.mpd">Case 1: Basic MDP Configuration</option>
+                        <option value="./cases/2.mpd">Case 2: Basic MDP Configuration with Service Locations Filter</option>
+                        <option value="./cases/3.mpd">Case 3: Enable CMCD from JS code</option>
+                        <option value="./cases/4.mpd">Case 4: Multiple ServiceDescription elements</option>
+                        <option value="./cases/5.mpd">Case 5: Multiperiod MPD with ServiceDescription</option>
+                        <option value="./cases/6.mpd">Case 6: Setting serviceLocations & includeInRequest filters (border case)</option>
+                        <option value="./cases/7.mpd">Case 7: Setting includeInRequests only filter</option>
+                        <option value="./cases/8.mpd">Case 8: Setting serviceLocations & includeInRequests filters</option>
+                        <option value="./cases/9.mpd">Case 9: includeInRequest default value</option>
+                        <option value="./cases/10.mpd">Case 10: Keys are not defined</option>
+                        <option value="./cases/11.mpd">Case 11: Keys parameter has some invalid key</option>
+                        <option value="./cases/12.mpd">Case 12: Keys are defined but all the keys are not implemented</option>
+                        <option value="./cases/13.mpd">Case 13: includeInRequests is defined but has some invalid request type</option>
+                        <option value="./cases/14.mpd">Case 14: includeInRequests are defined but all the request types are not implemented</option>
+                        <option value="./cases/15.mpd">Case 15: Sending CMCD data to the steering server from the last video request</option>
+                        <option value="./cases/16.mpd">Case 16: Sending CMCD data to the steering server from the last audio request if MPD has only audio tracks</option>
+                    </select>
+                    <input type="checkbox" id="applyCMCDParameters" checked>applyCMCDParameters</input>
+                    <input type="checkbox" id="cmcdJS">CMCD from JS</input>
+                    <button type="button" id="load-button" class="btn btn-success">
+                        Load MPD
                     </button>
                 </div>
             </div>
@@ -267,6 +133,21 @@
                     <div id="location-selection-container">
                     </div>
                 </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-floating">
+                    <textarea class="form-control" placeholder="Sent CMCD data will be displayed here"
+                            id="trace"></textarea>
+                    <label for="trace">CMCD Data</label>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <p style=" font-weight: bold; font-size: 1.1em">MPD Source</p>
+                <div id="mpd-output" class="border"></div>
             </div>
         </div>
         <div class="row mt-2">
@@ -387,6 +268,5 @@
         init();
     });
 </script>
-<script src="../highlighter.js"></script>
 </body>
 </html>
