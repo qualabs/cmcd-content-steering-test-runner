@@ -90,7 +90,8 @@ function _load() {
                 enabled: cmcdJS, /* enable reporting of cmcd parameters */
                 sid: 'b248658d-1d1a-4039-91d0-8c08ba597da5', /* session id send with each request */
                 cid: '21cf726cfe3d937b5f974f72bb5bd06a', /* content id send with each request */
-                mode: CMCD_MODE_HEADER,
+                mode: cmcdJS ? CMCD_MODE_HEADER : CMCD_MODE_QUERY,
+                includeInRequests: ['mpd', 'segment' , 'steering'],
                 enabledKeys: ['br', 'd', 'ot', 'tb' , 'bl', 'dl', 'mtp', 'nor', 'nrr', 'su' , 'bs', 'rtp' , 'cid', 'pr', 'sf', 'sid', 'st', 'v']
             }
         }
