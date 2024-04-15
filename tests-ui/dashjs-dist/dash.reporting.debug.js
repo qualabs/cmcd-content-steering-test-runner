@@ -2232,7 +2232,13 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  *            enableManifestTimescaleMismatchFix: false,
  *            capabilities: {
  *               filterUnsupportedEssentialProperties: true,
- *               supportedEssentialProperties: Constants.THUMBNAILS_SCHEME_ID_URIS,
+ *               supportedEssentialProperties: [
+                    { schemeIdUri: Constants.FONT_DOWNLOAD_DVB_SCHEME },
+                    { schemeIdUri: Constants.COLOUR_PRIMARIES_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.MATRIX_COEFFICIENTS_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.TRANSFER_CHARACTERISTICS_SCHEME_ID_URI, value: '6' },
+                    ...Constants.THUMBNAILS_SCHEME_ID_URIS.map(ep => { return { 'schemeIdUri': ep }; })
+                ],
  *               useMediaCapabilitiesApi: false
  *            },
  *            timeShiftBuffer: {
@@ -2808,7 +2814,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @typedef {Object} Capabilities
  * @property {boolean} [filterUnsupportedEssentialProperties=true]
  * Enable to filter all the AdaptationSets and Representations which contain an unsupported \<EssentialProperty\> element.
- * @property {Array.<string>} [supportedEssentialProperties=Constants.THUMBNAILS_SCHEME_ID_URIS]
+ * @property {Array.<string>} [supportedEssentialProperties]
  * List of supported \<EssentialProperty\> elements
  * @property {boolean} [useMediaCapabilitiesApi=false]
  * Enable to use the MediaCapabilities API to check whether codecs are supported. If disabled MSE.isTypeSupported will be used instead.
@@ -3006,7 +3012,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {Array.<string>} [includeInRequests]
  * Specifies which HTTP GET requests shall carry parameters.
  * 
- * If not specified this value defaults to ['mpd', 'segment', 'other'].
+ * If not specified this value defaults to ['segment'].
  */
 
 /**
@@ -3050,9 +3056,9 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {boolean} [applyProducerReferenceTime=true]
  * Set to true if dash.js should use the parameters defined in ProducerReferenceTime elements in combination with ServiceDescription elements.
  * @property {boolean} [applyContentSteering=true]
- * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
- * @property {boolean} [applyCMCDParameters=true]
  * Set to true if dash.js should apply content steering during playback.
+ * @property {boolean} [applyParametersFromMpd=true]
+ * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
  * @property {number} [eventControllerRefreshDelay=100]
  * For multi-period streams, overwrite the manifest mediaPresentationDuration attribute with the sum of period durations if the manifest mediaPresentationDuration is greater than the sum of period durations
  * @property {boolean} [enableManifestDurationMismatchFix=true]
@@ -3190,14 +3196,28 @@ function Settings() {
       applyServiceDescription: true,
       applyProducerReferenceTime: true,
       applyContentSteering: true,
-      applyCMCDParameters: true,
       eventControllerRefreshDelay: 100,
       enableManifestDurationMismatchFix: true,
       parseInbandPrft: false,
       enableManifestTimescaleMismatchFix: false,
       capabilities: {
         filterUnsupportedEssentialProperties: true,
-        supportedEssentialProperties: [_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS)),
+        supportedEssentialProperties: [{
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].COLOUR_PRIMARIES_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].MATRIX_COEFFICIENTS_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].TRANSFER_CHARACTERISTICS_SCHEME_ID_URI,
+          value: '6'
+        }].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS.map(function (ep) {
+          return {
+            'schemeIdUri': ep
+          };
+        }))),
         useMediaCapabilitiesApi: false
       },
       timeShiftBuffer: {
@@ -3403,6 +3423,7 @@ function Settings() {
         }
       },
       cmcd: {
+        applyParametersFromMpd: true,
         enabled: false,
         sid: null,
         cid: null,
@@ -3410,7 +3431,7 @@ function Settings() {
         rtpSafetyFactor: 5,
         mode: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_MODE_QUERY,
         enabledKeys: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_AVAILABLE_KEYS,
-        includeInRequests: ['mpd', 'segment', 'other']
+        includeInRequests: ['segment']
       },
       cmsd: {
         enabled: false,
@@ -3440,7 +3461,7 @@ function Settings() {
     for (var n in source) {
       if (source.hasOwnProperty(n)) {
         if (dest.hasOwnProperty(n)) {
-          if (_typeof(source[n]) === 'object' && !(source[n] instanceof Array) && source[n] !== null) {
+          if (_typeof(source[n]) === 'object' && !(source[n] instanceof RegExp) && !(source[n] instanceof Array) && source[n] !== null) {
             mixinSettings(source[n], dest[n], path.slice() + n + '.');
           } else {
             dest[n] = _Utils_js__WEBPACK_IMPORTED_MODULE_1__["default"].clone(source[n]);
@@ -3589,6 +3610,9 @@ var Utils = /*#__PURE__*/function () {
         return src; // anything
       }
 
+      if (src instanceof RegExp) {
+        return new RegExp(src);
+      }
       var r;
       if (src instanceof Array) {
         // array
@@ -3700,6 +3724,16 @@ var Utils = /*#__PURE__*/function () {
         return relativePath;
       } catch (e) {
         return targetUrl;
+      }
+    }
+  }, {
+    key: "getHostFromUrl",
+    value: function getHostFromUrl(urlString) {
+      try {
+        var url = new URL(urlString);
+        return url.host;
+      } catch (e) {
+        return null;
       }
     }
   }, {
@@ -4780,17 +4814,17 @@ __webpack_require__.r(__webpack_exports__);
    */
   CMCD_MODE_HEADER: 'header',
   /**
-   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
   CMCD_AVAILABLE_KEYS: ['br', 'd', 'ot', 'tb', 'bl', 'dl', 'mtp', 'nor', 'nrr', 'su', 'bs', 'rtp', 'cid', 'pr', 'sf', 'sid', 'st', 'v'],
   /**
-   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
-  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering'],
+  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering', 'other'],
   INITIALIZE: 'initialize',
   TEXT_SHOWING: 'showing',
   TEXT_HIDDEN: 'hidden',
@@ -4803,8 +4837,12 @@ __webpack_require__.r(__webpack_exports__);
   START_TIME: 'starttime',
   SERVICE_DESCRIPTION_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:scope:2019',
   SUPPLEMENTAL_PROPERTY_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:critical:2019',
+  CTA_5004_2023_SCHEME: 'urn:mpeg:dash:cta-5004:2023',
   THUMBNAILS_SCHEME_ID_URIS: ['http://dashif.org/thumbnail_tile', 'http://dashif.org/guidelines/thumbnail_tile'],
   FONT_DOWNLOAD_DVB_SCHEME: 'urn:dvb:dash:fontdownload:2014',
+  COLOUR_PRIMARIES_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:ColourPrimaries',
+  MATRIX_COEFFICIENTS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:MatrixCoefficients',
+  TRANSFER_CHARACTERISTICS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:TransferCharacteristics',
   XML: 'XML',
   ARRAY_BUFFER: 'ArrayBuffer',
   DVB_REPORTING_URL: 'dvb:reportingUrl',
@@ -4862,7 +4900,8 @@ __webpack_require__.r(__webpack_exports__);
    *  @memberof Constants#
    *  @static
    */
-  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3'
+  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3',
+  COMMON_ACCESS_TOKEN_HEADER: 'common-access-token'
 });
 
 /***/ }),
@@ -4960,6 +4999,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MetricsController_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MetricsController.js */ "./src/streaming/metrics/controllers/MetricsController.js");
 /* harmony import */ var _utils_ManifestParsing_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/ManifestParsing.js */ "./src/streaming/metrics/utils/ManifestParsing.js");
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -4990,6 +5030,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -5056,7 +5097,7 @@ function MetricsCollectionController(config) {
   return instance;
 }
 MetricsCollectionController.__dashjs_factory_name = 'MetricsCollectionController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsCollectionController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(MetricsCollectionController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5071,6 +5112,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _RangeController_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./RangeController.js */ "./src/streaming/metrics/controllers/RangeController.js");
 /* harmony import */ var _ReportingController_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ReportingController.js */ "./src/streaming/metrics/controllers/ReportingController.js");
 /* harmony import */ var _MetricsHandlersController_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./MetricsHandlersController.js */ "./src/streaming/metrics/controllers/MetricsHandlersController.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5101,6 +5143,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -5151,7 +5194,7 @@ function MetricsController(config) {
   return instance;
 }
 MetricsController.__dashjs_factory_name = 'MetricsController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(MetricsController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5164,6 +5207,7 @@ MetricsController.__dashjs_factory_name = 'MetricsController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _metrics_MetricsHandlerFactory_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../metrics/MetricsHandlerFactory.js */ "./src/streaming/metrics/metrics/MetricsHandlerFactory.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5194,6 +5238,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function MetricsHandlersController(config) {
@@ -5252,7 +5297,7 @@ function MetricsHandlersController(config) {
   return instance;
 }
 MetricsHandlersController.__dashjs_factory_name = 'MetricsHandlersController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsHandlersController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(MetricsHandlersController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5265,6 +5310,7 @@ MetricsHandlersController.__dashjs_factory_name = 'MetricsHandlersController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_CustomTimeRanges_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/CustomTimeRanges.js */ "./src/streaming/utils/CustomTimeRanges.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5295,6 +5341,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function RangeController(config) {
@@ -5347,7 +5394,7 @@ function RangeController(config) {
   return instance;
 }
 RangeController.__dashjs_factory_name = 'RangeController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(RangeController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(RangeController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5360,6 +5407,7 @@ RangeController.__dashjs_factory_name = 'RangeController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reporting_ReportingFactory_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reporting/ReportingFactory.js */ "./src/streaming/metrics/reporting/ReportingFactory.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5390,6 +5438,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function ReportingController(config) {
@@ -5428,7 +5477,7 @@ function ReportingController(config) {
   return instance;
 }
 ReportingController.__dashjs_factory_name = 'ReportingController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ReportingController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(ReportingController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5444,6 +5493,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _handlers_DVBErrorsHandler_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./handlers/DVBErrorsHandler.js */ "./src/streaming/metrics/metrics/handlers/DVBErrorsHandler.js");
 /* harmony import */ var _handlers_HttpListHandler_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./handlers/HttpListHandler.js */ "./src/streaming/metrics/metrics/handlers/HttpListHandler.js");
 /* harmony import */ var _handlers_GenericMetricHandler_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./handlers/GenericMetricHandler.js */ "./src/streaming/metrics/metrics/handlers/GenericMetricHandler.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5474,6 +5524,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -5527,7 +5578,7 @@ function MetricsHandlerFactory(config) {
   return instance;
 }
 MetricsHandlerFactory.__dashjs_factory_name = 'MetricsHandlerFactory';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(MetricsHandlerFactory)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(MetricsHandlerFactory)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5540,6 +5591,7 @@ MetricsHandlerFactory.__dashjs_factory_name = 'MetricsHandlerFactory';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_HandlerHelpers_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/HandlerHelpers.js */ "./src/streaming/metrics/utils/HandlerHelpers.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5570,6 +5622,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function BufferLevelHandler(config) {
@@ -5629,7 +5682,7 @@ function BufferLevelHandler(config) {
   return instance;
 }
 BufferLevelHandler.__dashjs_factory_name = 'BufferLevelHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(BufferLevelHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(BufferLevelHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5642,6 +5695,7 @@ BufferLevelHandler.__dashjs_factory_name = 'BufferLevelHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5672,6 +5726,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function DVBErrorsHandler(config) {
@@ -5711,7 +5766,7 @@ function DVBErrorsHandler(config) {
   };
   return instance;
 }
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(DVBErrorsHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(DVBErrorsHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5723,6 +5778,7 @@ function DVBErrorsHandler(config) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5753,6 +5809,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -5783,7 +5841,7 @@ function GenericMetricHandler() {
   return instance;
 }
 GenericMetricHandler.__dashjs_factory_name = 'GenericMetricHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(GenericMetricHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getClassFactory(GenericMetricHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5796,6 +5854,7 @@ GenericMetricHandler.__dashjs_factory_name = 'GenericMetricHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_HandlerHelpers_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/HandlerHelpers.js */ "./src/streaming/metrics/utils/HandlerHelpers.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5826,6 +5885,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function HttpListHandler(config) {
@@ -5879,7 +5939,7 @@ function HttpListHandler(config) {
   return instance;
 }
 HttpListHandler.__dashjs_factory_name = 'HttpListHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(HttpListHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(HttpListHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5892,6 +5952,7 @@ HttpListHandler.__dashjs_factory_name = 'HttpListHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reporters_DVBReporting_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reporters/DVBReporting.js */ "./src/streaming/metrics/reporting/reporters/DVBReporting.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5922,6 +5983,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function ReportingFactory(config) {
@@ -5962,7 +6024,7 @@ function ReportingFactory(config) {
   return instance;
 }
 ReportingFactory.__dashjs_factory_name = 'ReportingFactory';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ReportingFactory)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getSingletonFactory(ReportingFactory)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5977,6 +6039,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_MetricSerialiser_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/MetricSerialiser.js */ "./src/streaming/metrics/utils/MetricSerialiser.js");
 /* harmony import */ var _utils_RNG_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../utils/RNG.js */ "./src/streaming/metrics/utils/RNG.js");
 /* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6007,6 +6070,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -6146,7 +6210,7 @@ function DVBReporting(config) {
   return instance;
 }
 DVBReporting.__dashjs_factory_name = 'DVBReporting';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(DVBReporting)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(DVBReporting)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6160,6 +6224,7 @@ DVBReporting.__dashjs_factory_name = 'DVBReporting';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_DVBErrors_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/DVBErrors.js */ "./src/streaming/metrics/vo/DVBErrors.js");
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6190,6 +6255,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -6304,7 +6370,7 @@ function DVBErrorsTranslator(config) {
   return instance;
 }
 DVBErrorsTranslator.__dashjs_factory_name = 'DVBErrorsTranslator';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(DVBErrorsTranslator)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(DVBErrorsTranslator)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6316,6 +6382,7 @@ DVBErrorsTranslator.__dashjs_factory_name = 'DVBErrorsTranslator';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6346,6 +6413,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -6381,7 +6450,7 @@ function HandlerHelpers() {
   };
 }
 HandlerHelpers.__dashjs_factory_name = 'HandlerHelpers';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(HandlerHelpers)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(HandlerHelpers)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6396,6 +6465,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_Metrics_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/Metrics.js */ "./src/streaming/metrics/vo/Metrics.js");
 /* harmony import */ var _vo_Range_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/Range.js */ "./src/streaming/metrics/vo/Range.js");
 /* harmony import */ var _vo_Reporting_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../vo/Reporting.js */ "./src/streaming/metrics/vo/Reporting.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+
 
 
 
@@ -6493,7 +6564,7 @@ function ManifestParsing(config) {
   return instance;
 }
 ManifestParsing.__dashjs_factory_name = 'ManifestParsing';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ManifestParsing)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getSingletonFactory(ManifestParsing)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6505,6 +6576,7 @@ ManifestParsing.__dashjs_factory_name = 'ManifestParsing';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6535,6 +6607,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -6595,7 +6669,7 @@ function MetricSerialiser() {
   };
 }
 MetricSerialiser.__dashjs_factory_name = 'MetricSerialiser';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(MetricSerialiser)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(MetricSerialiser)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6607,6 +6681,7 @@ MetricSerialiser.__dashjs_factory_name = 'MetricSerialiser';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6637,6 +6712,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -6690,7 +6767,7 @@ function RNG() {
   return instance;
 }
 RNG.__dashjs_factory_name = 'RNG';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(RNG)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(RNG)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -7148,7 +7225,7 @@ function CustomParametersModel() {
 
   /**
    * Registers a custom capabilities filter. This enables application to filter representations to use.
-   * The provided callback function shall return a boolean based on whether or not to use the representation.
+   * The provided callback function shall return a boolean or promise resolving to a boolean based on whether or not to use the representation.
    * The filters are applied in the order they are registered.
    * @param {function} filter - the custom capabilities filter callback
    */

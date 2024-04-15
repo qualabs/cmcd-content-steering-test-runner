@@ -81,12 +81,12 @@ function log(msg) {
 }
 
 function _load() {
-    const applyCMCDParameters = document.getElementById('applyCMCDParameters').checked;
+    const applyParametersFromMpd = document.getElementById('applyParametersFromMpd').checked;
     const cmcdJS = document.getElementById('cmcdJS').checked;
     player.updateSettings({
         streaming: {
-            applyCMCDParameters,
             cmcd: {
+                applyParametersFromMpd,
                 enabled: cmcdJS, /* enable reporting of cmcd parameters */
                 sid: 'b248658d-1d1a-4039-91d0-8c08ba597da5', /* session id send with each request */
                 cid: '21cf726cfe3d937b5f974f72bb5bd06a', /* content id send with each request */

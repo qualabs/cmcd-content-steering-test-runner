@@ -23244,6 +23244,7 @@ cea.extractCea608DataFromRange = extractCea608DataFromRange;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   XML_ENTITIES: function() { return /* binding */ XML_ENTITIES; },
 /* harmony export */   filter: function() { return /* binding */ filter; },
 /* harmony export */   getElementById: function() { return /* binding */ getElementById; },
 /* harmony export */   getElementsByClassName: function() { return /* binding */ getElementsByClassName; },
@@ -23251,7 +23252,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   simplify: function() { return /* binding */ simplify; },
 /* harmony export */   simplifyLostLess: function() { return /* binding */ simplifyLostLess; },
 /* harmony export */   stringify: function() { return /* binding */ stringify; },
-/* harmony export */   toContentString: function() { return /* binding */ toContentString; }
+/* harmony export */   toContentString: function() { return /* binding */ toContentString; },
+/* harmony export */   translateEntitiesAndCharacterReferences: function() { return /* binding */ translateEntitiesAndCharacterReferences; }
 /* harmony export */ });
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
@@ -23299,6 +23301,64 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {boolean} [simplify]
  * @property {(a: tNode, b: tNode) => boolean} [filter]
  */
+
+/**
+ * Predefined general entities used in XML
+ * See https://www.w3.org/TR/xml/#sec-predefined-ent
+ */
+var XML_ENTITIES = {
+  '&amp;': '&',
+  '&gt;': '>',
+  '&lt;': '<',
+  '&quot;': '"',
+  '&apos;': "'"
+};
+
+/**
+ * Translates XML predefined entities and character references to their respective characters.
+ * @param {Object} entitiesList
+ * @param {String} str
+ * @returns {String}
+ */
+function translateEntitiesAndCharacterReferences(entitiesList, str) {
+  var entitySplit = str.split(/(&[#a-zA-Z0-9]+;)/);
+  if (entitySplit.length <= 1) {
+    // No entities. Skip the rest of the function.
+    return str;
+  }
+  for (var i = 1; i < entitySplit.length; i += 2) {
+    var reference = entitySplit[i];
+
+    /*
+     * Check if it is a character reference of the form
+     * /&#[0-9]+;/ - Encoded in decimal, or
+     * /&#x[0-9a-fA-F]+;/ - Encoded in hexadecimal
+     * See https://www.w3.org/TR/xml/#sec-references
+     */
+    if (reference.charAt(1) === '#') {
+      var code = void 0;
+      if (reference.charAt(2) === 'x') {
+        // Hexadecimal
+        code = parseInt(reference.substring(3, reference.length - 1), 16);
+      } else {
+        // Decimal
+        code = parseInt(reference.substring(2, reference.length - 1), 10);
+      }
+
+      // Translate into string according to ISO/IEC 10646
+      if (!isNaN(code) && code >= 0 && code <= 0x10FFFF) {
+        entitySplit[i] = String.fromCodePoint(code);
+      }
+    }
+    /*
+     * Translate entity references using a dictionary.
+     */else if (entitiesList.hasOwnProperty(reference)) {
+      entitySplit[i] = entitiesList[reference];
+    }
+  }
+  return entitySplit.join('');
+}
+;
 
 /**
  * parseXML / html into a DOM Object. with no validation and some failur tolerance
@@ -23439,7 +23499,7 @@ function parse(S, options) {
     if (tagName === 'S') {
       return parseInt(value);
     }
-    var attrValue = value;
+    var attrValue = translateEntitiesAndCharacterReferences(XML_ENTITIES, value);
     attrMatchers.forEach(function (matcher) {
       if (matcher.test(tagName, attrName, value)) {
         attrValue = matcher.converter(value);
@@ -23456,7 +23516,7 @@ function parse(S, options) {
     var start = pos;
     pos = S.indexOf(openBracket, pos) - 1;
     if (pos === -2) pos = S.length;
-    return S.slice(start, pos + 1);
+    return translateEntitiesAndCharacterReferences(XML_ENTITIES, S.slice(start, pos + 1));
   }
   /**
    *    returns text until the first nonAlphabetic letter
@@ -24571,7 +24631,13 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  *            enableManifestTimescaleMismatchFix: false,
  *            capabilities: {
  *               filterUnsupportedEssentialProperties: true,
- *               supportedEssentialProperties: Constants.THUMBNAILS_SCHEME_ID_URIS,
+ *               supportedEssentialProperties: [
+                    { schemeIdUri: Constants.FONT_DOWNLOAD_DVB_SCHEME },
+                    { schemeIdUri: Constants.COLOUR_PRIMARIES_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.MATRIX_COEFFICIENTS_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.TRANSFER_CHARACTERISTICS_SCHEME_ID_URI, value: '6' },
+                    ...Constants.THUMBNAILS_SCHEME_ID_URIS.map(ep => { return { 'schemeIdUri': ep }; })
+                ],
  *               useMediaCapabilitiesApi: false
  *            },
  *            timeShiftBuffer: {
@@ -25147,7 +25213,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @typedef {Object} Capabilities
  * @property {boolean} [filterUnsupportedEssentialProperties=true]
  * Enable to filter all the AdaptationSets and Representations which contain an unsupported \<EssentialProperty\> element.
- * @property {Array.<string>} [supportedEssentialProperties=Constants.THUMBNAILS_SCHEME_ID_URIS]
+ * @property {Array.<string>} [supportedEssentialProperties]
  * List of supported \<EssentialProperty\> elements
  * @property {boolean} [useMediaCapabilitiesApi=false]
  * Enable to use the MediaCapabilities API to check whether codecs are supported. If disabled MSE.isTypeSupported will be used instead.
@@ -25345,7 +25411,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {Array.<string>} [includeInRequests]
  * Specifies which HTTP GET requests shall carry parameters.
  * 
- * If not specified this value defaults to ['mpd', 'segment', 'other'].
+ * If not specified this value defaults to ['segment'].
  */
 
 /**
@@ -25389,9 +25455,9 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {boolean} [applyProducerReferenceTime=true]
  * Set to true if dash.js should use the parameters defined in ProducerReferenceTime elements in combination with ServiceDescription elements.
  * @property {boolean} [applyContentSteering=true]
- * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
- * @property {boolean} [applyCMCDParameters=true]
  * Set to true if dash.js should apply content steering during playback.
+ * @property {boolean} [applyParametersFromMpd=true]
+ * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
  * @property {number} [eventControllerRefreshDelay=100]
  * For multi-period streams, overwrite the manifest mediaPresentationDuration attribute with the sum of period durations if the manifest mediaPresentationDuration is greater than the sum of period durations
  * @property {boolean} [enableManifestDurationMismatchFix=true]
@@ -25529,14 +25595,28 @@ function Settings() {
       applyServiceDescription: true,
       applyProducerReferenceTime: true,
       applyContentSteering: true,
-      applyCMCDParameters: true,
       eventControllerRefreshDelay: 100,
       enableManifestDurationMismatchFix: true,
       parseInbandPrft: false,
       enableManifestTimescaleMismatchFix: false,
       capabilities: {
         filterUnsupportedEssentialProperties: true,
-        supportedEssentialProperties: [_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS)),
+        supportedEssentialProperties: [{
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].COLOUR_PRIMARIES_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].MATRIX_COEFFICIENTS_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].TRANSFER_CHARACTERISTICS_SCHEME_ID_URI,
+          value: '6'
+        }].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS.map(function (ep) {
+          return {
+            'schemeIdUri': ep
+          };
+        }))),
         useMediaCapabilitiesApi: false
       },
       timeShiftBuffer: {
@@ -25742,6 +25822,7 @@ function Settings() {
         }
       },
       cmcd: {
+        applyParametersFromMpd: true,
         enabled: false,
         sid: null,
         cid: null,
@@ -25749,7 +25830,7 @@ function Settings() {
         rtpSafetyFactor: 5,
         mode: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_MODE_QUERY,
         enabledKeys: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_AVAILABLE_KEYS,
-        includeInRequests: ['mpd', 'segment', 'other']
+        includeInRequests: ['segment']
       },
       cmsd: {
         enabled: false,
@@ -25779,7 +25860,7 @@ function Settings() {
     for (var n in source) {
       if (source.hasOwnProperty(n)) {
         if (dest.hasOwnProperty(n)) {
-          if (_typeof(source[n]) === 'object' && !(source[n] instanceof Array) && source[n] !== null) {
+          if (_typeof(source[n]) === 'object' && !(source[n] instanceof RegExp) && !(source[n] instanceof Array) && source[n] !== null) {
             mixinSettings(source[n], dest[n], path.slice() + n + '.');
           } else {
             dest[n] = _Utils_js__WEBPACK_IMPORTED_MODULE_1__["default"].clone(source[n]);
@@ -25928,6 +26009,9 @@ var Utils = /*#__PURE__*/function () {
         return src; // anything
       }
 
+      if (src instanceof RegExp) {
+        return new RegExp(src);
+      }
       var r;
       if (src instanceof Array) {
         // array
@@ -26039,6 +26123,16 @@ var Utils = /*#__PURE__*/function () {
         return relativePath;
       } catch (e) {
         return targetUrl;
+      }
+    }
+  }, {
+    key: "getHostFromUrl",
+    value: function getHostFromUrl(urlString) {
+      try {
+        var url = new URL(urlString);
+        return url.host;
+      } catch (e) {
+        return null;
       }
     }
   }, {
@@ -29433,10 +29527,8 @@ __webpack_require__.r(__webpack_exports__);
   BYTE_RANGE: 'byteRange',
   CENC_DEFAULT_KID: 'cenc:default_KID',
   CLIENT_DATA_REPORTING: 'ClientDataReporting',
-  CLIENT_DATA_REPORTING_AS_ARRAY: 'ClientDataReporting_asArray',
   CLIENT_REQUIREMENT: 'clientRequirement',
   CMCD_PARAMETERS: 'CMCDParameters',
-  CMCD_PARAMETERS_AS_ARRAY: 'CMCDParameters_asArray',
   CODECS: 'codecs',
   CODEC_PRIVATE_DATA: 'codecPrivateData',
   CODING_DEPENDENCY: 'codingDependency',
@@ -30922,7 +31014,7 @@ function ServiceDescriptionController() {
   }
 
   /**
-   * Add information about client data reporting element. Handling is up to the ContentSteeringController
+   * Add information about client data reporting element. Handling is up to the CMCDModel
    *  @param {object} sd
    *  @private
    */
@@ -31066,6 +31158,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_PatchLocation_js__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ../vo/PatchLocation.js */ "./src/dash/vo/PatchLocation.js");
 /* harmony import */ var _vo_ContentProtection_js__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ../vo/ContentProtection.js */ "./src/dash/vo/ContentProtection.js");
 /* harmony import */ var _vo_ClientDataReporting_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ../vo/ClientDataReporting.js */ "./src/dash/vo/ClientDataReporting.js");
+/* harmony import */ var _vo_CMCDParameters_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ../vo/CMCDParameters.js */ "./src/dash/vo/CMCDParameters.js");
 function _createForOfIteratorHelper(o, allowArrayLike) { var it = typeof Symbol !== "undefined" && o[Symbol.iterator] || o["@@iterator"]; if (!it) { if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") { if (it) o = it; var i = 0; var F = function F() {}; return { s: F, n: function n() { if (i >= o.length) return { done: true }; return { done: false, value: o[i++] }; }, e: function e(_e) { throw _e; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var normalCompletion = true, didErr = false, err; return { s: function s() { it = it.call(o); }, n: function n() { var step = it.next(); normalCompletion = step.done; return step; }, e: function e(_e2) { didErr = true; err = _e2; }, f: function f() { try { if (!normalCompletion && it["return"] != null) it["return"](); } finally { if (didErr) throw err; } } }; }
 function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
@@ -31103,6 +31196,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -31819,8 +31913,8 @@ function DashManifestModel() {
       throw new Error('Period cannot be null or undefined');
     }
     var id = _vo_Period_js__WEBPACK_IMPORTED_MODULE_4__["default"].DEFAULT_ID + '_' + i;
-    if (realPeriod.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].ID) && realPeriod.id.length > 0 && realPeriod.id !== '__proto__') {
-      id = realPeriod.id;
+    if (realPeriod.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].ID) && realPeriod.id.toString().length > 0 && realPeriod.id !== '__proto__') {
+      id = realPeriod.id.toString();
     }
     return id;
   }
@@ -32115,10 +32209,11 @@ function DashManifestModel() {
     }
     return entry;
   }
-  function _createClientDataResportingInstance(element) {
+  function _createClientDataReportingInstance(element) {
     var entry = new _vo_ClientDataReporting_js__WEBPACK_IMPORTED_MODULE_22__["default"]();
-    if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS)) {
-      entry.CMCDParameters = element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS];
+    if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS) && element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS].schemeIdUri === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_0__["default"].CTA_5004_2023_SCHEME) {
+      entry.cmcdParameters = new _vo_CMCDParameters_js__WEBPACK_IMPORTED_MODULE_23__["default"]();
+      entry.cmcdParameters.init(element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS]);
     }
     if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS) && element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS] !== '') {
       entry.serviceLocations = element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS];
@@ -32213,7 +32308,7 @@ function DashManifestModel() {
                 element = Array.isArray(element) ? element.at(element.length - 1) : element;
                 contentSteering = _createContentSteeringInstance(element);
               } else if (prop === _constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CLIENT_DATA_REPORTING) {
-                clientDataReporting = _createClientDataResportingInstance(sd[prop]);
+                clientDataReporting = _createClientDataReportingInstance(sd[prop]);
               }
             }
           }
@@ -34889,6 +34984,104 @@ BaseURL.DEFAULT_DVB_WEIGHT = DEFAULT_DVB_WEIGHT;
 
 /***/ }),
 
+/***/ "./src/dash/vo/CMCDParameters.js":
+/*!***************************************!*\
+  !*** ./src/dash/vo/CMCDParameters.js ***!
+  \***************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _DescriptorType_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./DescriptorType.js */ "./src/dash/vo/DescriptorType.js");
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
+function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
+function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
+function _get() { if (typeof Reflect !== "undefined" && Reflect.get) { _get = Reflect.get.bind(); } else { _get = function _get(target, property, receiver) { var base = _superPropBase(target, property); if (!base) return; var desc = Object.getOwnPropertyDescriptor(base, property); if (desc.get) { return desc.get.call(arguments.length < 3 ? target : receiver); } return desc.value; }; } return _get.apply(this, arguments); }
+function _superPropBase(object, property) { while (!Object.prototype.hasOwnProperty.call(object, property)) { object = _getPrototypeOf(object); if (object === null) break; } return object; }
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2024, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+
+/**
+ * @class
+ * @ignore
+ */
+var CMCDParameters = /*#__PURE__*/function (_DescriptorType) {
+  _inherits(CMCDParameters, _DescriptorType);
+  var _super = _createSuper(CMCDParameters);
+  function CMCDParameters() {
+    var _this;
+    _classCallCheck(this, CMCDParameters);
+    _this = _super.call(this);
+    _this.version = null;
+    _this.sessionID = null;
+    _this.contentID = null;
+    _this.mode = null;
+    _this.keys = null;
+    _this.includeInRequests = null;
+    return _this;
+  }
+  _createClass(CMCDParameters, [{
+    key: "init",
+    value: function init(data) {
+      _get(_getPrototypeOf(CMCDParameters.prototype), "init", this).call(this, data);
+      if (data) {
+        var _data$mode;
+        this.version = data.version;
+        this.sessionID = data.sessionID;
+        this.contentID = data.contentID;
+        this.mode = (_data$mode = data.mode) !== null && _data$mode !== void 0 ? _data$mode : 'query';
+        this.keys = data.keys ? data.keys.split(' ') : null;
+        this.includeInRequests = data.includeInRequests ? data.includeInRequests.split(' ') : ['segment'];
+        this.schemeIdUri = data.schemeIdUri;
+      }
+    }
+  }]);
+  return CMCDParameters;
+}(_DescriptorType_js__WEBPACK_IMPORTED_MODULE_0__["default"]);
+/* harmony default export */ __webpack_exports__["default"] = (CMCDParameters);
+
+/***/ }),
+
 /***/ "./src/dash/vo/ClientDataReporting.js":
 /*!********************************************!*\
   !*** ./src/dash/vo/ClientDataReporting.js ***!
@@ -34939,7 +35132,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
  */
 var ClientDataReporting = /*#__PURE__*/_createClass(function ClientDataReporting() {
   _classCallCheck(this, ClientDataReporting);
-  this.CMCDParameters = null;
+  this.cmcdParameters = null;
   this.serviceLocations = null;
   this.serviceLocationsArray = [];
   this.adaptationSets = null;
@@ -35315,6 +35508,21 @@ var DescriptorType = /*#__PURE__*/function () {
           this.dvbFontFamily = data[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_0__["default"].DVB_FONTFAMILY];
         }
       }
+    }
+  }, {
+    key: "inArray",
+    value: function inArray(arr) {
+      var _this = this;
+      if (arr) {
+        return arr.some(function (entry) {
+          return _this.schemeIdUri === entry.schemeIdUri && (_this.value ? _this.value.match(entry.value) :
+          // check if provided value matches RegExp
+          ''.match(entry.value) // check if RegExp allows absent value   
+          );
+        });
+      }
+
+      return false;
     }
   }]);
   return DescriptorType;
@@ -37204,31 +37412,31 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _models_VideoModel_js__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ./models/VideoModel.js */ "./src/streaming/models/VideoModel.js");
 /* harmony import */ var _models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ./models/CmcdModel.js */ "./src/streaming/models/CmcdModel.js");
 /* harmony import */ var _models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ./models/CmsdModel.js */ "./src/streaming/models/CmsdModel.js");
-/* harmony import */ var _models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./models/ClientDataReportingModel.js */ "./src/streaming/models/ClientDataReportingModel.js");
-/* harmony import */ var _utils_DOMStorage_js__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ./utils/DOMStorage.js */ "./src/streaming/utils/DOMStorage.js");
-/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! ./../core/Debug.js */ "./src/core/Debug.js");
-/* harmony import */ var _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ./../core/errors/Errors.js */ "./src/core/errors/Errors.js");
-/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./../core/EventBus.js */ "./src/core/EventBus.js");
-/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./../core/events/Events.js */ "./src/core/events/Events.js");
-/* harmony import */ var _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ./MediaPlayerEvents.js */ "./src/streaming/MediaPlayerEvents.js");
-/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
-/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ../core/Settings.js */ "./src/core/Settings.js");
-/* harmony import */ var _core_Version_js__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ../core/Version.js */ "./src/core/Version.js");
-/* harmony import */ var _dash_controllers_SegmentBaseController_js__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ../dash/controllers/SegmentBaseController.js */ "./src/dash/controllers/SegmentBaseController.js");
-/* harmony import */ var _dash_DashAdapter_js__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ../dash/DashAdapter.js */ "./src/dash/DashAdapter.js");
-/* harmony import */ var _dash_DashMetrics_js__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ../dash/DashMetrics.js */ "./src/dash/DashMetrics.js");
-/* harmony import */ var _dash_utils_TimelineConverter_js__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ../dash/utils/TimelineConverter.js */ "./src/dash/utils/TimelineConverter.js");
-/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ./vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
-/* harmony import */ var _externals_base64_js__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! ../../externals/base64.js */ "./externals/base64.js");
-/* harmony import */ var codem_isoboxer__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! codem-isoboxer */ "./node_modules/codem-isoboxer/dist/iso_boxer.js");
-/* harmony import */ var _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! ./vo/DashJSError.js */ "./src/streaming/vo/DashJSError.js");
-/* harmony import */ var _utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_42__ = __webpack_require__(/*! ./utils/SupervisorTools.js */ "./src/streaming/utils/SupervisorTools.js");
-/* harmony import */ var _ManifestUpdater_js__WEBPACK_IMPORTED_MODULE_43__ = __webpack_require__(/*! ./ManifestUpdater.js */ "./src/streaming/ManifestUpdater.js");
-/* harmony import */ var _streaming_utils_URLUtils_js__WEBPACK_IMPORTED_MODULE_44__ = __webpack_require__(/*! ../streaming/utils/URLUtils.js */ "./src/streaming/utils/URLUtils.js");
-/* harmony import */ var _utils_BoxParser_js__WEBPACK_IMPORTED_MODULE_45__ = __webpack_require__(/*! ./utils/BoxParser.js */ "./src/streaming/utils/BoxParser.js");
-/* harmony import */ var _text_TextController_js__WEBPACK_IMPORTED_MODULE_46__ = __webpack_require__(/*! ./text/TextController.js */ "./src/streaming/text/TextController.js");
-/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_47__ = __webpack_require__(/*! ./models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
-/* harmony import */ var _controllers_ThroughputController_js__WEBPACK_IMPORTED_MODULE_48__ = __webpack_require__(/*! ./controllers/ThroughputController.js */ "./src/streaming/controllers/ThroughputController.js");
+/* harmony import */ var _utils_DOMStorage_js__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! ./utils/DOMStorage.js */ "./src/streaming/utils/DOMStorage.js");
+/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! ./../core/Debug.js */ "./src/core/Debug.js");
+/* harmony import */ var _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! ./../core/errors/Errors.js */ "./src/core/errors/Errors.js");
+/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! ./../core/EventBus.js */ "./src/core/EventBus.js");
+/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! ./../core/events/Events.js */ "./src/core/events/Events.js");
+/* harmony import */ var _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! ./MediaPlayerEvents.js */ "./src/streaming/MediaPlayerEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! ../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! ../core/Settings.js */ "./src/core/Settings.js");
+/* harmony import */ var _core_Version_js__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! ../core/Version.js */ "./src/core/Version.js");
+/* harmony import */ var _dash_controllers_SegmentBaseController_js__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! ../dash/controllers/SegmentBaseController.js */ "./src/dash/controllers/SegmentBaseController.js");
+/* harmony import */ var _dash_DashAdapter_js__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! ../dash/DashAdapter.js */ "./src/dash/DashAdapter.js");
+/* harmony import */ var _dash_DashMetrics_js__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! ../dash/DashMetrics.js */ "./src/dash/DashMetrics.js");
+/* harmony import */ var _dash_utils_TimelineConverter_js__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! ../dash/utils/TimelineConverter.js */ "./src/dash/utils/TimelineConverter.js");
+/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_37__ = __webpack_require__(/*! ./vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
+/* harmony import */ var _externals_base64_js__WEBPACK_IMPORTED_MODULE_38__ = __webpack_require__(/*! ../../externals/base64.js */ "./externals/base64.js");
+/* harmony import */ var codem_isoboxer__WEBPACK_IMPORTED_MODULE_39__ = __webpack_require__(/*! codem-isoboxer */ "./node_modules/codem-isoboxer/dist/iso_boxer.js");
+/* harmony import */ var _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_40__ = __webpack_require__(/*! ./vo/DashJSError.js */ "./src/streaming/vo/DashJSError.js");
+/* harmony import */ var _utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_41__ = __webpack_require__(/*! ./utils/SupervisorTools.js */ "./src/streaming/utils/SupervisorTools.js");
+/* harmony import */ var _ManifestUpdater_js__WEBPACK_IMPORTED_MODULE_42__ = __webpack_require__(/*! ./ManifestUpdater.js */ "./src/streaming/ManifestUpdater.js");
+/* harmony import */ var _streaming_utils_URLUtils_js__WEBPACK_IMPORTED_MODULE_43__ = __webpack_require__(/*! ../streaming/utils/URLUtils.js */ "./src/streaming/utils/URLUtils.js");
+/* harmony import */ var _utils_BoxParser_js__WEBPACK_IMPORTED_MODULE_44__ = __webpack_require__(/*! ./utils/BoxParser.js */ "./src/streaming/utils/BoxParser.js");
+/* harmony import */ var _text_TextController_js__WEBPACK_IMPORTED_MODULE_45__ = __webpack_require__(/*! ./text/TextController.js */ "./src/streaming/text/TextController.js");
+/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_46__ = __webpack_require__(/*! ./models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _controllers_ThroughputController_js__WEBPACK_IMPORTED_MODULE_47__ = __webpack_require__(/*! ./controllers/ThroughputController.js */ "./src/streaming/controllers/ThroughputController.js");
+/* harmony import */ var _controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_48__ = __webpack_require__(/*! ./controllers/ClientDataReportingController.js */ "./src/streaming/controllers/ClientDataReportingController.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -37293,8 +37501,8 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
 //Dash
+
 
 
 
@@ -37354,12 +37562,12 @@ function MediaPlayer() {
    */
   var ARRAY_NOT_SUPPORTED_ERROR = 'Array type not supported for settings!';
   var context = this.context;
-  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_28__["default"])(context).getInstance();
-  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_32__["default"])(context).getInstance();
-  var debug = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_26__["default"])(context).getInstance({
+  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_27__["default"])(context).getInstance();
+  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_31__["default"])(context).getInstance();
+  var debug = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_25__["default"])(context).getInstance({
     settings: settings
   });
-  var instance, logger, source, protectionData, mediaPlayerInitialized, streamingInitialized, playbackInitialized, autoPlay, providedStartTime, abrController, throughputController, schemeLoaderFactory, timelineConverter, mediaController, protectionController, metricsReportingController, mssHandler, offlineController, adapter, mediaPlayerModel, customParametersModel, errHandler, baseURLController, capabilities, capabilitiesFilter, streamController, textController, gapController, playbackController, serviceDescriptionController, contentSteeringController, catchupController, dashMetrics, manifestModel, cmcdModel, cmsdModel, clientDataReportingModel, videoModel, uriFragmentModel, domStorage, segmentBaseController;
+  var instance, logger, source, protectionData, mediaPlayerInitialized, streamingInitialized, playbackInitialized, autoPlay, providedStartTime, abrController, throughputController, schemeLoaderFactory, timelineConverter, mediaController, protectionController, metricsReportingController, mssHandler, offlineController, adapter, mediaPlayerModel, customParametersModel, errHandler, baseURLController, capabilities, capabilitiesFilter, streamController, textController, gapController, playbackController, serviceDescriptionController, contentSteeringController, catchupController, dashMetrics, manifestModel, cmcdModel, cmsdModel, videoModel, uriFragmentModel, domStorage, segmentBaseController, clientDataReportingController;
 
   /*
   ---------------------------------------------------------------------------
@@ -37378,9 +37586,9 @@ function MediaPlayer() {
     protectionData = null;
     adapter = null;
     segmentBaseController = null;
-    _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].extend(_MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__["default"]);
+    _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].extend(_MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__["default"]);
     mediaPlayerModel = (0,_models_MediaPlayerModel_js__WEBPACK_IMPORTED_MODULE_18__["default"])(context).getInstance();
-    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_47__["default"])(context).getInstance();
+    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_46__["default"])(context).getInstance();
     videoModel = (0,_models_VideoModel_js__WEBPACK_IMPORTED_MODULE_21__["default"])(context).getInstance();
     uriFragmentModel = (0,_models_URIFragmentModel_js__WEBPACK_IMPORTED_MODULE_16__["default"])(context).getInstance();
   }
@@ -37422,6 +37630,9 @@ function MediaPlayer() {
     }
     if (config.contentSteeringController) {
       contentSteeringController = config.contentSteeringController;
+    }
+    if (config.clientDataReportingController) {
+      clientDataReportingController = config.clientDataReportingController;
     }
     if (config.catchupController) {
       catchupController = config.catchupController;
@@ -37478,16 +37689,16 @@ function MediaPlayer() {
       errHandler = (0,_utils_ErrorHandler_js__WEBPACK_IMPORTED_MODULE_13__["default"])(context).getInstance();
     }
     if (!capabilities.supportsMediaSource()) {
-      errHandler.error(new _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_41__["default"](_core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"].CAPABILITY_MEDIASOURCE_ERROR_CODE, _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"].CAPABILITY_MEDIASOURCE_ERROR_MESSAGE));
+      errHandler.error(new _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_40__["default"](_core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"].CAPABILITY_MEDIASOURCE_ERROR_CODE, _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"].CAPABILITY_MEDIASOURCE_ERROR_MESSAGE));
       return;
     }
     if (!mediaPlayerInitialized) {
       mediaPlayerInitialized = true;
 
       // init some controllers and models
-      timelineConverter = (0,_dash_utils_TimelineConverter_js__WEBPACK_IMPORTED_MODULE_37__["default"])(context).getInstance();
+      timelineConverter = (0,_dash_utils_TimelineConverter_js__WEBPACK_IMPORTED_MODULE_36__["default"])(context).getInstance();
       if (!throughputController) {
-        throughputController = (0,_controllers_ThroughputController_js__WEBPACK_IMPORTED_MODULE_48__["default"])(context).getInstance();
+        throughputController = (0,_controllers_ThroughputController_js__WEBPACK_IMPORTED_MODULE_47__["default"])(context).getInstance();
       }
       if (!abrController) {
         abrController = (0,_controllers_AbrController_js__WEBPACK_IMPORTED_MODULE_19__["default"])(context).getInstance();
@@ -37519,22 +37730,22 @@ function MediaPlayer() {
       if (!capabilitiesFilter) {
         capabilitiesFilter = (0,_utils_CapabilitiesFilter_js__WEBPACK_IMPORTED_MODULE_15__["default"])(context).getInstance();
       }
-      adapter = (0,_dash_DashAdapter_js__WEBPACK_IMPORTED_MODULE_35__["default"])(context).getInstance();
+      adapter = (0,_dash_DashAdapter_js__WEBPACK_IMPORTED_MODULE_34__["default"])(context).getInstance();
       manifestModel = (0,_models_ManifestModel_js__WEBPACK_IMPORTED_MODULE_17__["default"])(context).getInstance();
       cmcdModel = (0,_models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_22__["default"])(context).getInstance();
       cmsdModel = (0,_models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_23__["default"])(context).getInstance();
-      clientDataReportingModel = (0,_models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_24__["default"])(context).getInstance();
-      dashMetrics = (0,_dash_DashMetrics_js__WEBPACK_IMPORTED_MODULE_36__["default"])(context).getInstance({
+      clientDataReportingController = (0,_controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_48__["default"])(context).getInstance();
+      dashMetrics = (0,_dash_DashMetrics_js__WEBPACK_IMPORTED_MODULE_35__["default"])(context).getInstance({
         settings: settings
       });
-      domStorage = (0,_utils_DOMStorage_js__WEBPACK_IMPORTED_MODULE_25__["default"])(context).getInstance({
+      domStorage = (0,_utils_DOMStorage_js__WEBPACK_IMPORTED_MODULE_24__["default"])(context).getInstance({
         settings: settings
       });
       adapter.setConfig({
         constants: _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"],
         cea608parser: _externals_cea608_parser_js__WEBPACK_IMPORTED_MODULE_0__["default"],
         errHandler: errHandler,
-        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_39__["default"]
+        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_38__["default"]
       });
       if (!baseURLController) {
         baseURLController = (0,_controllers_BaseURLController_js__WEBPACK_IMPORTED_MODULE_11__["default"])(context).create();
@@ -37547,16 +37758,16 @@ function MediaPlayer() {
         adapter: adapter
       });
       if (!segmentBaseController) {
-        segmentBaseController = (0,_dash_controllers_SegmentBaseController_js__WEBPACK_IMPORTED_MODULE_34__["default"])(context).getInstance({
+        segmentBaseController = (0,_dash_controllers_SegmentBaseController_js__WEBPACK_IMPORTED_MODULE_33__["default"])(context).getInstance({
           dashMetrics: dashMetrics,
           mediaPlayerModel: mediaPlayerModel,
           errHandler: errHandler,
           baseURLController: baseURLController,
-          events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"],
+          events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"],
           eventBus: eventBus,
           debug: debug,
-          boxParser: (0,_utils_BoxParser_js__WEBPACK_IMPORTED_MODULE_45__["default"])(context).getInstance(),
-          errors: _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"]
+          boxParser: (0,_utils_BoxParser_js__WEBPACK_IMPORTED_MODULE_44__["default"])(context).getInstance(),
+          errors: _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"]
         });
       }
 
@@ -37637,7 +37848,7 @@ function MediaPlayer() {
    */
   function destroy() {
     reset();
-    _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_31__["default"].deleteSingletonInstances(context);
+    _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_30__["default"].deleteSingletonInstances(context);
   }
 
   /**
@@ -37687,7 +37898,7 @@ function MediaPlayer() {
    * @instance
    */
   function getVersion() {
-    return (0,_core_Version_js__WEBPACK_IMPORTED_MODULE_33__.getVersionString)();
+    return (0,_core_Version_js__WEBPACK_IMPORTED_MODULE_32__.getVersionString)();
   }
 
   /**
@@ -37791,7 +38002,7 @@ function MediaPlayer() {
     if (!playbackInitialized) {
       throw PLAYBACK_NOT_INITIALIZED_ERROR;
     }
-    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_42__.checkParameterType)(value, 'number');
+    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_41__.checkParameterType)(value, 'number');
     if (isNaN(value)) {
       throw _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"].BAD_ARGUMENT_ERROR;
     }
@@ -37887,7 +38098,7 @@ function MediaPlayer() {
    * @instance
    */
   function setMute(value) {
-    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_42__.checkParameterType)(value, 'boolean');
+    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_41__.checkParameterType)(value, 'boolean');
     getVideoElement().muted = value;
   }
 
@@ -38114,7 +38325,7 @@ function MediaPlayer() {
    *
    */
   function setAutoPlay(value) {
-    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_42__.checkParameterType)(value, 'boolean');
+    (0,_utils_SupervisorTools_js__WEBPACK_IMPORTED_MODULE_41__.checkParameterType)(value, 'boolean');
     autoPlay = value;
   }
 
@@ -38696,7 +38907,10 @@ function MediaPlayer() {
       throw STREAMING_NOT_INITIALIZED_ERROR;
     }
     var streamInfo = streamController.getActiveStreamInfo();
-    return mediaController.getCurrentTrackFor(type, streamInfo.id);
+    if (streamInfo) {
+      return mediaController.getCurrentTrackFor(type, streamInfo.id);
+    }
+    return null;
   }
 
   /**
@@ -38768,7 +38982,7 @@ function MediaPlayer() {
   */
   /**
    * Registers a custom capabilities filter. This enables application to filter representations to use.
-   * The provided callback function shall return a boolean based on whether or not to use the representation.
+   * The provided callback function shall return either a boolean or a promise resolving to a boolean based on whether or not to use the representation.
    * The filters are applied in the order they are registered.
    * @param {function} filter - the custom capabilities filter callback
    * @memberof module:MediaPlayer
@@ -38994,10 +39208,10 @@ function MediaPlayer() {
       } else {
         callback(null, e.error);
       }
-      eventBus.off(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
+      eventBus.off(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
       manifestLoader.reset();
     };
-    eventBus.on(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
+    eventBus.on(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
     uriFragmentModel.initialize(url);
     manifestLoader.load(url);
   }
@@ -39084,14 +39298,14 @@ function MediaPlayer() {
     var self = this;
     if (typeof callback === 'function') {
       var handler = function handler(e) {
-        eventBus.off(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
+        eventBus.off(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
         if (e.error) {
           callback(null, e.error);
           return;
         }
         callback(e.manifest);
       };
-      eventBus.on(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
+      eventBus.on(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].INTERNAL_MANIFEST_LOADED, handler, self);
     }
     streamController.refreshManifest();
   }
@@ -39203,7 +39417,7 @@ function MediaPlayer() {
    * @instance
    */
   function extend(parentNameString, childInstance, override) {
-    _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_31__["default"].extend(parentNameString, childInstance, override, context);
+    _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_30__["default"].extend(parentNameString, childInstance, override, context);
   }
 
   /**
@@ -39317,7 +39531,7 @@ function MediaPlayer() {
       streamController = (0,_controllers_StreamController_js__WEBPACK_IMPORTED_MODULE_5__["default"])(context).getInstance();
     }
     if (!textController) {
-      textController = (0,_text_TextController_js__WEBPACK_IMPORTED_MODULE_46__["default"])(context).create({
+      textController = (0,_text_TextController_js__WEBPACK_IMPORTED_MODULE_45__["default"])(context).create({
         errHandler: errHandler,
         manifestModel: manifestModel,
         adapter: adapter,
@@ -39407,7 +39621,7 @@ function MediaPlayer() {
       serviceDescriptionController: serviceDescriptionController,
       throughputController: throughputController
     });
-    clientDataReportingModel.setConfig({
+    clientDataReportingController.setConfig({
       serviceDescriptionController: serviceDescriptionController
     });
     cmsdModel.setConfig({});
@@ -39439,16 +39653,19 @@ function MediaPlayer() {
     if (protectionController) {
       return protectionController;
     }
+    if (typeof dashjs === 'undefined') {
+      return null;
+    }
     // do not require Protection as dependencies as this is optional and intended to be loaded separately
-    var Protection = dashjs.Protection; /* jshint ignore:line */
-    if (typeof Protection === 'function') {
+    var detectedProtection = dashjs.Protection; /* jshint ignore:line */
+    if (typeof detectedProtection === 'function') {
       //TODO need a better way to register/detect plugin components
-      var protection = Protection(context).create();
-      _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].extend(Protection.events);
-      _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__["default"].extend(Protection.events, {
+      var protection = detectedProtection(context).create();
+      _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].extend(detectedProtection.events);
+      _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__["default"].extend(detectedProtection.events, {
         publicOnly: true
       });
-      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"].extend(Protection.errors);
+      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"].extend(detectedProtection.errors);
       if (!capabilities) {
         capabilities = (0,_utils_Capabilities_js__WEBPACK_IMPORTED_MODULE_14__["default"])(context).getInstance();
       }
@@ -39459,8 +39676,8 @@ function MediaPlayer() {
         customParametersModel: customParametersModel,
         capabilities: capabilities,
         eventBus: eventBus,
-        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"],
-        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_39__["default"],
+        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"],
+        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_38__["default"],
         constants: _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"],
         cmcdModel: cmcdModel,
         settings: settings
@@ -39470,14 +39687,14 @@ function MediaPlayer() {
     return null;
   }
   function _detectMetricsReporting() {
-    if (metricsReportingController) {
+    if (metricsReportingController || typeof dashjs === 'undefined') {
       return;
     }
     // do not require MetricsReporting as dependencies as this is optional and intended to be loaded separately
-    var MetricsReporting = dashjs.MetricsReporting; /* jshint ignore:line */
-    if (typeof MetricsReporting === 'function') {
+    var detectedMetricsReporting = dashjs.MetricsReporting; /* jshint ignore:line */
+    if (typeof detectedMetricsReporting === 'function') {
       //TODO need a better way to register/detect plugin components
-      var metricsReporting = MetricsReporting(context).create();
+      var metricsReporting = detectedMetricsReporting(context).create();
       metricsReportingController = metricsReporting.createMetricsReporting({
         debug: debug,
         eventBus: eventBus,
@@ -39485,22 +39702,23 @@ function MediaPlayer() {
         adapter: adapter,
         dashMetrics: dashMetrics,
         mediaPlayerModel: mediaPlayerModel,
-        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"],
+        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"],
         constants: _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"],
         metricsConstants: _constants_MetricsConstants_js__WEBPACK_IMPORTED_MODULE_3__["default"]
       });
     }
   }
   function _detectMss() {
-    if (mssHandler) {
+    if (mssHandler || typeof dashjs === 'undefined') {
       return;
     }
+
     // do not require MssHandler as dependencies as this is optional and intended to be loaded separately
-    var MssHandler = dashjs.MssHandler; /* jshint ignore:line */
-    if (typeof MssHandler === 'function') {
+    var detectedMssHandler = dashjs.MssHandler; /* jshint ignore:line */
+    if (typeof detectedMssHandler === 'function') {
       //TODO need a better way to register/detect plugin components
-      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"].extend(MssHandler.errors);
-      mssHandler = MssHandler(context).create({
+      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"].extend(detectedMssHandler.errors);
+      mssHandler = detectedMssHandler(context).create({
         eventBus: eventBus,
         mediaPlayerModel: mediaPlayerModel,
         dashMetrics: dashMetrics,
@@ -39510,12 +39728,12 @@ function MediaPlayer() {
         protectionController: protectionController,
         baseURLController: baseURLController,
         errHandler: errHandler,
-        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"],
+        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"],
         constants: _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"],
         debug: debug,
-        initSegmentType: _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_38__.HTTPRequest.INIT_SEGMENT_TYPE,
-        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_39__["default"],
-        ISOBoxer: codem_isoboxer__WEBPACK_IMPORTED_MODULE_40__,
+        initSegmentType: _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_37__.HTTPRequest.INIT_SEGMENT_TYPE,
+        BASE64: _externals_base64_js__WEBPACK_IMPORTED_MODULE_38__["default"],
+        ISOBoxer: codem_isoboxer__WEBPACK_IMPORTED_MODULE_39__,
         settings: settings
       });
     }
@@ -39527,19 +39745,22 @@ function MediaPlayer() {
     if (offlineController) {
       return offlineController;
     }
+    if (typeof dashjs === 'undefined') {
+      return null;
+    }
 
     // do not require Offline as dependencies as this is optional and intended to be loaded separately
-    var OfflineController = dashjs.OfflineController; /* jshint ignore:line */
+    var detectedOfflineController = dashjs.OfflineController; /* jshint ignore:line */
 
-    if (typeof OfflineController === 'function') {
+    if (typeof detectedOfflineController === 'function') {
       //TODO need a better way to register/detect plugin components
-      _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"].extend(OfflineController.events);
-      _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__["default"].extend(OfflineController.events, {
+      _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"].extend(detectedOfflineController.events);
+      _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__["default"].extend(detectedOfflineController.events, {
         publicOnly: true
       });
-      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"].extend(OfflineController.errors);
+      _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"].extend(detectedOfflineController.errors);
       var manifestLoader = _createManifestLoader();
-      var manifestUpdater = (0,_ManifestUpdater_js__WEBPACK_IMPORTED_MODULE_43__["default"])(context).create();
+      var manifestUpdater = (0,_ManifestUpdater_js__WEBPACK_IMPORTED_MODULE_42__["default"])(context).create();
       manifestUpdater.setConfig({
         manifestModel: manifestModel,
         adapter: adapter,
@@ -39547,7 +39768,7 @@ function MediaPlayer() {
         errHandler: errHandler,
         contentSteeringController: contentSteeringController
       });
-      offlineController = OfflineController(context).create({
+      offlineController = detectedOfflineController(context).create({
         debug: debug,
         manifestUpdater: manifestUpdater,
         baseURLController: baseURLController,
@@ -39563,12 +39784,12 @@ function MediaPlayer() {
         segmentBaseController: segmentBaseController,
         schemeLoaderFactory: schemeLoaderFactory,
         eventBus: eventBus,
-        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_29__["default"],
-        errors: _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"],
+        events: _core_events_Events_js__WEBPACK_IMPORTED_MODULE_28__["default"],
+        errors: _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"],
         constants: _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"],
         settings: settings,
         dashConstants: _dash_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_2__["default"],
-        urlUtils: (0,_streaming_utils_URLUtils_js__WEBPACK_IMPORTED_MODULE_44__["default"])(context).getInstance()
+        urlUtils: (0,_streaming_utils_URLUtils_js__WEBPACK_IMPORTED_MODULE_43__["default"])(context).getInstance()
       });
       return offlineController;
     }
@@ -39635,7 +39856,7 @@ function MediaPlayer() {
     }
     if (!playbackInitialized && isReady()) {
       playbackInitialized = true;
-      eventBus.trigger(_MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__["default"].PLAYBACK_INITIALIZED);
+      eventBus.trigger(_MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__["default"].PLAYBACK_INITIALIZED);
       logger.info('Playback Initialized');
     }
   }
@@ -39747,10 +39968,10 @@ function MediaPlayer() {
   return instance;
 }
 MediaPlayer.__dashjs_factory_name = 'MediaPlayer';
-var factory = _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_31__["default"].getClassFactory(MediaPlayer);
-factory.events = _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_30__["default"];
-factory.errors = _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_27__["default"];
-_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_31__["default"].updateClassFactory(MediaPlayer.__dashjs_factory_name, factory);
+var factory = _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_30__["default"].getClassFactory(MediaPlayer);
+factory.events = _MediaPlayerEvents_js__WEBPACK_IMPORTED_MODULE_29__["default"];
+factory.errors = _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_26__["default"];
+_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_30__["default"].updateClassFactory(MediaPlayer.__dashjs_factory_name, factory);
 /* harmony default export */ __webpack_exports__["default"] = (factory);
 
 /***/ }),
@@ -41437,7 +41658,7 @@ function Stream(config) {
     if (type === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_0__["default"].TEXT || type === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_0__["default"].IMAGE) {
       return true;
     }
-    if (!!mediaInfo.contentProtection && !capabilities.supportsEncryptedMedia()) {
+    if (!!mediaInfo.contentProtection && mediaInfo.contentProtection.length > 0 && !capabilities.supportsEncryptedMedia()) {
       errHandler.error(new _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_10__["default"](_core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_8__["default"].CAPABILITY_MEDIAKEYS_ERROR_CODE, _core_errors_Errors_js__WEBPACK_IMPORTED_MODULE_8__["default"].CAPABILITY_MEDIAKEYS_ERROR_MESSAGE));
       return false;
     }
@@ -43607,17 +43828,17 @@ __webpack_require__.r(__webpack_exports__);
    */
   CMCD_MODE_HEADER: 'header',
   /**
-   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
   CMCD_AVAILABLE_KEYS: ['br', 'd', 'ot', 'tb', 'bl', 'dl', 'mtp', 'nor', 'nrr', 'su', 'bs', 'rtp', 'cid', 'pr', 'sf', 'sid', 'st', 'v'],
   /**
-   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
-  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering'],
+  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering', 'other'],
   INITIALIZE: 'initialize',
   TEXT_SHOWING: 'showing',
   TEXT_HIDDEN: 'hidden',
@@ -43630,8 +43851,12 @@ __webpack_require__.r(__webpack_exports__);
   START_TIME: 'starttime',
   SERVICE_DESCRIPTION_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:scope:2019',
   SUPPLEMENTAL_PROPERTY_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:critical:2019',
+  CTA_5004_2023_SCHEME: 'urn:mpeg:dash:cta-5004:2023',
   THUMBNAILS_SCHEME_ID_URIS: ['http://dashif.org/thumbnail_tile', 'http://dashif.org/guidelines/thumbnail_tile'],
   FONT_DOWNLOAD_DVB_SCHEME: 'urn:dvb:dash:fontdownload:2014',
+  COLOUR_PRIMARIES_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:ColourPrimaries',
+  MATRIX_COEFFICIENTS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:MatrixCoefficients',
+  TRANSFER_CHARACTERISTICS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:TransferCharacteristics',
   XML: 'XML',
   ARRAY_BUFFER: 'ArrayBuffer',
   DVB_REPORTING_URL: 'dvb:reportingUrl',
@@ -43689,7 +43914,8 @@ __webpack_require__.r(__webpack_exports__);
    *  @memberof Constants#
    *  @static
    */
-  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3'
+  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3',
+  COMMON_ACCESS_TOKEN_HEADER: 'common-access-token'
 });
 
 /***/ }),
@@ -46278,6 +46504,175 @@ function CatchupController() {
 }
 CatchupController.__dashjs_factory_name = 'CatchupController';
 /* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(CatchupController));
+
+/***/ }),
+
+/***/ "./src/streaming/controllers/ClientDataReportingController.js":
+/*!********************************************************************!*\
+  !*** ./src/streaming/controllers/ClientDataReportingController.js ***!
+  \********************************************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2024, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+function ClientDataReportingController() {
+  var instance, serviceDescriptionController;
+  function setConfig(config) {
+    if (!config) return;
+    if (config.serviceDescriptionController) {
+      serviceDescriptionController = config.serviceDescriptionController;
+    }
+  }
+  function isServiceLocationIncluded(requestType, serviceLocation) {
+    var _serviceDescriptionCo, _serviceDescriptionCo2;
+    if (requestType === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__.HTTPRequest.CONTENT_STEERING_TYPE) {
+      return true;
+    }
+    var _ref = (_serviceDescriptionCo = (_serviceDescriptionCo2 = serviceDescriptionController) === null || _serviceDescriptionCo2 === void 0 || (_serviceDescriptionCo2 = _serviceDescriptionCo2.getServiceDescriptionSettings()) === null || _serviceDescriptionCo2 === void 0 ? void 0 : _serviceDescriptionCo2.clientDataReporting) !== null && _serviceDescriptionCo !== void 0 ? _serviceDescriptionCo : {},
+      serviceLocationsArray = _ref.serviceLocationsArray;
+    var isIncluded = serviceLocationsArray ? (serviceLocationsArray === null || serviceLocationsArray === void 0 ? void 0 : serviceLocationsArray.length) === 0 || serviceLocationsArray.includes(serviceLocation) : true;
+    return isIncluded;
+  }
+  function isAdaptationsIncluded(adaptationSet) {
+    var _serviceDescriptionCo3, _serviceDescriptionCo4;
+    var _ref2 = (_serviceDescriptionCo3 = (_serviceDescriptionCo4 = serviceDescriptionController) === null || _serviceDescriptionCo4 === void 0 || (_serviceDescriptionCo4 = _serviceDescriptionCo4.getServiceDescriptionSettings()) === null || _serviceDescriptionCo4 === void 0 ? void 0 : _serviceDescriptionCo4.clientDataReporting) !== null && _serviceDescriptionCo3 !== void 0 ? _serviceDescriptionCo3 : {},
+      adaptationSetsArray = _ref2.adaptationSetsArray;
+    var isIncluded = adaptationSetsArray ? (adaptationSetsArray === null || adaptationSetsArray === void 0 ? void 0 : adaptationSetsArray.length) === 0 || adaptationSetsArray.includes(adaptationSet) : true;
+    return isIncluded;
+  }
+  instance = {
+    setConfig: setConfig,
+    isAdaptationsIncluded: isAdaptationsIncluded,
+    isServiceLocationIncluded: isServiceLocationIncluded
+  };
+  return instance;
+}
+ClientDataReportingController.__dashjs_factory_name = 'ClientDataReportingController';
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(ClientDataReportingController));
+
+/***/ }),
+
+/***/ "./src/streaming/controllers/CommonAccessTokenController.js":
+/*!******************************************************************!*\
+  !*** ./src/streaming/controllers/CommonAccessTokenController.js ***!
+  \******************************************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
+/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2013, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+
+
+function CommonAccessTokenController() {
+  var instance, hostTokenMap;
+  function processResponseHeaders(httpResponse) {
+    if (!httpResponse || !httpResponse.headers || !httpResponse.request || !httpResponse.request.url) {
+      return;
+    }
+    var commonAccessTokenHeader = httpResponse.headers[_constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"].COMMON_ACCESS_TOKEN_HEADER];
+    if (commonAccessTokenHeader) {
+      var host = _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__["default"].getHostFromUrl(httpResponse.request.url);
+      if (host) {
+        hostTokenMap[host] = commonAccessTokenHeader;
+      }
+    }
+  }
+  function getCommonAccessTokenForUrl(url) {
+    if (!url) {
+      return null;
+    }
+    var host = _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__["default"].getHostFromUrl(url);
+    if (host) {
+      return hostTokenMap[host] ? hostTokenMap[host] : null;
+    }
+  }
+  function setup() {
+    _resetInitialSettings();
+  }
+  function reset() {
+    _resetInitialSettings();
+  }
+  function _resetInitialSettings() {
+    hostTokenMap = {};
+  }
+  instance = {
+    reset: reset,
+    processResponseHeaders: processResponseHeaders,
+    getCommonAccessTokenForUrl: getCommonAccessTokenForUrl
+  };
+  setup();
+  return instance;
+}
+CommonAccessTokenController.__dashjs_factory_name = 'CommonAccessTokenController';
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(CommonAccessTokenController));
 
 /***/ }),
 
@@ -52663,6 +53058,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MetricsController_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MetricsController.js */ "./src/streaming/metrics/controllers/MetricsController.js");
 /* harmony import */ var _utils_ManifestParsing_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/ManifestParsing.js */ "./src/streaming/metrics/utils/ManifestParsing.js");
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -52693,6 +53089,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -52759,7 +53156,7 @@ function MetricsCollectionController(config) {
   return instance;
 }
 MetricsCollectionController.__dashjs_factory_name = 'MetricsCollectionController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsCollectionController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(MetricsCollectionController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -52774,6 +53171,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _RangeController_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./RangeController.js */ "./src/streaming/metrics/controllers/RangeController.js");
 /* harmony import */ var _ReportingController_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ReportingController.js */ "./src/streaming/metrics/controllers/ReportingController.js");
 /* harmony import */ var _MetricsHandlersController_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./MetricsHandlersController.js */ "./src/streaming/metrics/controllers/MetricsHandlersController.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -52804,6 +53202,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -52854,7 +53253,7 @@ function MetricsController(config) {
   return instance;
 }
 MetricsController.__dashjs_factory_name = 'MetricsController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(MetricsController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -52867,6 +53266,7 @@ MetricsController.__dashjs_factory_name = 'MetricsController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _metrics_MetricsHandlerFactory_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../metrics/MetricsHandlerFactory.js */ "./src/streaming/metrics/metrics/MetricsHandlerFactory.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -52897,6 +53297,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function MetricsHandlersController(config) {
@@ -52955,7 +53356,7 @@ function MetricsHandlersController(config) {
   return instance;
 }
 MetricsHandlersController.__dashjs_factory_name = 'MetricsHandlersController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MetricsHandlersController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(MetricsHandlersController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -52968,6 +53369,7 @@ MetricsHandlersController.__dashjs_factory_name = 'MetricsHandlersController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_CustomTimeRanges_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/CustomTimeRanges.js */ "./src/streaming/utils/CustomTimeRanges.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -52998,6 +53400,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function RangeController(config) {
@@ -53050,7 +53453,7 @@ function RangeController(config) {
   return instance;
 }
 RangeController.__dashjs_factory_name = 'RangeController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(RangeController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(RangeController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53063,6 +53466,7 @@ RangeController.__dashjs_factory_name = 'RangeController';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reporting_ReportingFactory_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../reporting/ReportingFactory.js */ "./src/streaming/metrics/reporting/ReportingFactory.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53093,6 +53497,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function ReportingController(config) {
@@ -53131,7 +53536,7 @@ function ReportingController(config) {
   return instance;
 }
 ReportingController.__dashjs_factory_name = 'ReportingController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ReportingController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(ReportingController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53147,6 +53552,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _handlers_DVBErrorsHandler_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./handlers/DVBErrorsHandler.js */ "./src/streaming/metrics/metrics/handlers/DVBErrorsHandler.js");
 /* harmony import */ var _handlers_HttpListHandler_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./handlers/HttpListHandler.js */ "./src/streaming/metrics/metrics/handlers/HttpListHandler.js");
 /* harmony import */ var _handlers_GenericMetricHandler_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./handlers/GenericMetricHandler.js */ "./src/streaming/metrics/metrics/handlers/GenericMetricHandler.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53177,6 +53583,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -53230,7 +53637,7 @@ function MetricsHandlerFactory(config) {
   return instance;
 }
 MetricsHandlerFactory.__dashjs_factory_name = 'MetricsHandlerFactory';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(MetricsHandlerFactory)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(MetricsHandlerFactory)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53243,6 +53650,7 @@ MetricsHandlerFactory.__dashjs_factory_name = 'MetricsHandlerFactory';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_HandlerHelpers_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/HandlerHelpers.js */ "./src/streaming/metrics/utils/HandlerHelpers.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53273,6 +53681,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function BufferLevelHandler(config) {
@@ -53332,7 +53741,7 @@ function BufferLevelHandler(config) {
   return instance;
 }
 BufferLevelHandler.__dashjs_factory_name = 'BufferLevelHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(BufferLevelHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(BufferLevelHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53345,6 +53754,7 @@ BufferLevelHandler.__dashjs_factory_name = 'BufferLevelHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53375,6 +53785,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function DVBErrorsHandler(config) {
@@ -53414,7 +53825,7 @@ function DVBErrorsHandler(config) {
   };
   return instance;
 }
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(DVBErrorsHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(DVBErrorsHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53426,6 +53837,7 @@ function DVBErrorsHandler(config) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53456,6 +53868,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -53486,7 +53900,7 @@ function GenericMetricHandler() {
   return instance;
 }
 GenericMetricHandler.__dashjs_factory_name = 'GenericMetricHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(GenericMetricHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getClassFactory(GenericMetricHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53499,6 +53913,7 @@ GenericMetricHandler.__dashjs_factory_name = 'GenericMetricHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_HandlerHelpers_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/HandlerHelpers.js */ "./src/streaming/metrics/utils/HandlerHelpers.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53529,6 +53944,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function HttpListHandler(config) {
@@ -53582,7 +53998,7 @@ function HttpListHandler(config) {
   return instance;
 }
 HttpListHandler.__dashjs_factory_name = 'HttpListHandler';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(HttpListHandler)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(HttpListHandler)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53595,6 +54011,7 @@ HttpListHandler.__dashjs_factory_name = 'HttpListHandler';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _reporters_DVBReporting_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./reporters/DVBReporting.js */ "./src/streaming/metrics/reporting/reporters/DVBReporting.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53625,6 +54042,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function ReportingFactory(config) {
@@ -53665,7 +54083,7 @@ function ReportingFactory(config) {
   return instance;
 }
 ReportingFactory.__dashjs_factory_name = 'ReportingFactory';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ReportingFactory)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getSingletonFactory(ReportingFactory)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53680,6 +54098,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_MetricSerialiser_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../utils/MetricSerialiser.js */ "./src/streaming/metrics/utils/MetricSerialiser.js");
 /* harmony import */ var _utils_RNG_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../utils/RNG.js */ "./src/streaming/metrics/utils/RNG.js");
 /* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53710,6 +54129,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -53849,7 +54269,7 @@ function DVBReporting(config) {
   return instance;
 }
 DVBReporting.__dashjs_factory_name = 'DVBReporting';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(DVBReporting)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getClassFactory(DVBReporting)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -53863,6 +54283,7 @@ DVBReporting.__dashjs_factory_name = 'DVBReporting';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_DVBErrors_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/DVBErrors.js */ "./src/streaming/metrics/vo/DVBErrors.js");
 /* harmony import */ var _MetricsReportingEvents_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../MetricsReportingEvents.js */ "./src/streaming/metrics/MetricsReportingEvents.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -53893,6 +54314,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -54007,7 +54429,7 @@ function DVBErrorsTranslator(config) {
   return instance;
 }
 DVBErrorsTranslator.__dashjs_factory_name = 'DVBErrorsTranslator';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(DVBErrorsTranslator)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(DVBErrorsTranslator)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -54019,6 +54441,7 @@ DVBErrorsTranslator.__dashjs_factory_name = 'DVBErrorsTranslator';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -54049,6 +54472,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -54084,7 +54509,7 @@ function HandlerHelpers() {
   };
 }
 HandlerHelpers.__dashjs_factory_name = 'HandlerHelpers';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(HandlerHelpers)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(HandlerHelpers)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -54099,6 +54524,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_Metrics_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/Metrics.js */ "./src/streaming/metrics/vo/Metrics.js");
 /* harmony import */ var _vo_Range_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/Range.js */ "./src/streaming/metrics/vo/Range.js");
 /* harmony import */ var _vo_Reporting_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../vo/Reporting.js */ "./src/streaming/metrics/vo/Reporting.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+
 
 
 
@@ -54196,7 +54623,7 @@ function ManifestParsing(config) {
   return instance;
 }
 ManifestParsing.__dashjs_factory_name = 'ManifestParsing';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ManifestParsing)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_3__["default"].getSingletonFactory(ManifestParsing)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -54208,6 +54635,7 @@ ManifestParsing.__dashjs_factory_name = 'ManifestParsing';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -54238,6 +54666,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -54298,7 +54728,7 @@ function MetricSerialiser() {
   };
 }
 MetricSerialiser.__dashjs_factory_name = 'MetricSerialiser';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(MetricSerialiser)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(MetricSerialiser)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -54310,6 +54740,7 @@ MetricSerialiser.__dashjs_factory_name = 'MetricSerialiser';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -54340,6 +54771,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -54393,7 +54826,7 @@ function RNG() {
   return instance;
 }
 RNG.__dashjs_factory_name = 'RNG';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(RNG)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(RNG)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -55137,85 +55570,6 @@ BaseURLTreeModel.__dashjs_factory_name = 'BaseURLTreeModel';
 
 /***/ }),
 
-/***/ "./src/streaming/models/ClientDataReportingModel.js":
-/*!**********************************************************!*\
-  !*** ./src/streaming/models/ClientDataReportingModel.js ***!
-  \**********************************************************/
-/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
-/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
-/**
- * The copyright in this software is being made available under the BSD License,
- * included below. This software may be subject to other third party and contributor
- * rights, including patent rights, and no such rights are granted under this license.
- *
- * Copyright (c) 2024, Dash Industry Forum.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice, this
- *  list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *  this list of conditions and the following disclaimer in the documentation and/or
- *  other materials provided with the distribution.
- *  * Neither the name of Dash Industry Forum nor the names of its
- *  contributors may be used to endorse or promote products derived from this software
- *  without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
- *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- */
-
-
-function ClientDataReportingModel() {
-  var instance, serviceDescriptionController;
-  function setConfig(config) {
-    if (!config) return;
-    if (config.serviceDescriptionController) {
-      serviceDescriptionController = config.serviceDescriptionController;
-    }
-  }
-  function serviceLocationIncluded(requestType, serviceLocation) {
-    var _serviceDescriptionCo, _serviceDescriptionCo2;
-    if (requestType == _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__.HTTPRequest.CONTENT_STEERING_TYPE) {
-      return true;
-    }
-    var _ref = (_serviceDescriptionCo = (_serviceDescriptionCo2 = serviceDescriptionController) === null || _serviceDescriptionCo2 === void 0 || (_serviceDescriptionCo2 = _serviceDescriptionCo2.getServiceDescriptionSettings()) === null || _serviceDescriptionCo2 === void 0 ? void 0 : _serviceDescriptionCo2.clientDataReporting) !== null && _serviceDescriptionCo !== void 0 ? _serviceDescriptionCo : {},
-      serviceLocationsArray = _ref.serviceLocationsArray;
-    var isServiceLocationIncluded = serviceLocationsArray ? (serviceLocationsArray === null || serviceLocationsArray === void 0 ? void 0 : serviceLocationsArray.length) === 0 || serviceLocationsArray.includes(serviceLocation) : true;
-    return isServiceLocationIncluded;
-  }
-  function adaptationSetIncluded(adaptationSet) {
-    var _serviceDescriptionCo3, _serviceDescriptionCo4;
-    var _ref2 = (_serviceDescriptionCo3 = (_serviceDescriptionCo4 = serviceDescriptionController) === null || _serviceDescriptionCo4 === void 0 || (_serviceDescriptionCo4 = _serviceDescriptionCo4.getServiceDescriptionSettings()) === null || _serviceDescriptionCo4 === void 0 ? void 0 : _serviceDescriptionCo4.clientDataReporting) !== null && _serviceDescriptionCo3 !== void 0 ? _serviceDescriptionCo3 : {},
-      adaptationSetsArray = _ref2.adaptationSetsArray;
-    var isAdaptationsIncluded = adaptationSetsArray ? (adaptationSetsArray === null || adaptationSetsArray === void 0 ? void 0 : adaptationSetsArray.length) === 0 || adaptationSetsArray.includes(adaptationSet) : true;
-    return isAdaptationsIncluded;
-  }
-  instance = {
-    setConfig: setConfig,
-    adaptationSetIncluded: adaptationSetIncluded,
-    serviceLocationIncluded: serviceLocationIncluded
-  };
-  return instance;
-}
-ClientDataReportingModel.__dashjs_factory_name = 'ClientDataReportingModel';
-/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(ClientDataReportingModel));
-
-/***/ }),
-
 /***/ "./src/streaming/models/CmcdModel.js":
 /*!*******************************************!*\
   !*** ./src/streaming/models/CmcdModel.js ***!
@@ -55298,17 +55652,7 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 
 
 var CMCD_VERSION = 1;
-var CMCD_ALL_REQUESTS = '*';
-var OBJECT_TYPES = {
-  MANIFEST: 'm',
-  AUDIO: 'a',
-  VIDEO: 'v',
-  INIT: 'i',
-  CAPTION: 'c',
-  ISOBMFF_TEXT_TRACK: 'tt',
-  ENCRYPTION_KEY: 'k',
-  OTHER: 'o'
-};
+var DEFAULT_INCLUDE_IN_REQUESTS = 'segment';
 var RTP_SAFETY_FACTOR = 5;
 function CmcdModel() {
   var dashManifestModel, instance, logger, internalData, abrController, dashMetrics, playbackController, serviceDescriptionController, throughputController, streamProcessors, _lastMediaTypeRequest, _isStartup, _bufferLevelStarved, _initialMediaRequestsDone;
@@ -55397,8 +55741,8 @@ function CmcdModel() {
   }
   function _applyWhitelist(cmcdData) {
     try {
-      var cmcdParameters = getCmcdParametersFromManifest();
-      var enabledCMCDKeys = cmcdParameters.version ? cmcdParameters.keys.split(' ') : settings.get().streaming.cmcd.enabledKeys;
+      var cmcdParametersFromManifest = getCmcdParametersFromManifest();
+      var enabledCMCDKeys = cmcdParametersFromManifest.version ? cmcdParametersFromManifest.keys : settings.get().streaming.cmcd.enabledKeys;
       return Object.keys(cmcdData).filter(function (key) {
         return enabledCMCDKeys.includes(key);
       }).reduce(function (obj, key) {
@@ -55429,38 +55773,36 @@ function CmcdModel() {
     }
   }
   function isCmcdEnabled() {
-    var cmcdParameters = getCmcdParametersFromManifest();
-    return _canBeEnabled(cmcdParameters) && _checkIncludeInRequests(cmcdParameters) && _checkAvailableKeys(cmcdParameters);
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
+    return _canBeEnabled(cmcdParametersFromManifest) && _checkIncludeInRequests(cmcdParametersFromManifest) && _checkAvailableKeys(cmcdParametersFromManifest);
   }
-  function _canBeEnabled(cmcdParameters) {
-    if (Object.keys(cmcdParameters).length) {
-      if (!cmcdParameters.version) {
+  function _canBeEnabled(cmcdParametersFromManifest) {
+    if (Object.keys(cmcdParametersFromManifest).length) {
+      if (!cmcdParametersFromManifest.version) {
         logger.error("version parameter must be defined.");
         return false;
       }
-      if (!cmcdParameters.keys) {
+      if (!cmcdParametersFromManifest.keys) {
         logger.error("keys parameter must be defined.");
         return false;
       }
     }
-    return cmcdParameters.version ? true : settings.get().streaming.cmcd && settings.get().streaming.cmcd.enabled;
+    var isEnabledFromManifest = cmcdParametersFromManifest.version;
+    var isEnabledFromSettings = settings.get().streaming.cmcd && settings.get().streaming.cmcd.enabled;
+    return isEnabledFromManifest || isEnabledFromSettings;
   }
-  function _checkIncludeInRequests(cmcdParameters) {
+  function _checkIncludeInRequests(cmcdParametersFromManifest) {
     var enabledRequests = settings.get().streaming.cmcd.includeInRequests;
-    if (cmcdParameters.version) {
-      var _cmcdParameters$inclu, _cmcdParameters$inclu2;
-      enabledRequests = (_cmcdParameters$inclu = (_cmcdParameters$inclu2 = cmcdParameters.includeInRequests) === null || _cmcdParameters$inclu2 === void 0 ? void 0 : _cmcdParameters$inclu2.split(' ')) !== null && _cmcdParameters$inclu !== void 0 ? _cmcdParameters$inclu : [CMCD_ALL_REQUESTS];
-      if (!enabledRequests || enabledRequests.some(function (k) {
-        return k === CMCD_ALL_REQUESTS;
-      })) {
-        return true;
-      }
+    console.log(enabledRequests);
+    if (cmcdParametersFromManifest.version) {
+      var _cmcdParametersFromMa;
+      enabledRequests = (_cmcdParametersFromMa = cmcdParametersFromManifest.includeInRequests) !== null && _cmcdParametersFromMa !== void 0 ? _cmcdParametersFromMa : [DEFAULT_INCLUDE_IN_REQUESTS];
     }
     var defaultAvailableRequests = _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].CMCD_AVAILABLE_REQUESTS;
     var invalidRequests = enabledRequests.filter(function (k) {
       return !defaultAvailableRequests.includes(k);
     });
-    if (invalidRequests.length == enabledRequests.length) {
+    if (invalidRequests.length === enabledRequests.length) {
       logger.error("None of the request types are supported.");
       return false;
     }
@@ -55469,13 +55811,13 @@ function CmcdModel() {
     });
     return true;
   }
-  function _checkAvailableKeys(cmcdParameters) {
+  function _checkAvailableKeys(cmcdParametersFromManifest) {
     var defaultAvailableKeys = _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].CMCD_AVAILABLE_KEYS;
-    var enabledCMCDKeys = cmcdParameters.version ? cmcdParameters.keys.split(' ') : settings.get().streaming.cmcd.enabledKeys;
+    var enabledCMCDKeys = cmcdParametersFromManifest.version ? cmcdParametersFromManifest.keys : settings.get().streaming.cmcd.enabledKeys;
     var invalidKeys = enabledCMCDKeys.filter(function (k) {
       return !defaultAvailableKeys.includes(k);
     });
-    if (invalidKeys.length == enabledCMCDKeys.length && enabledCMCDKeys.length > 0) {
+    if (invalidKeys.length === enabledCMCDKeys.length && enabledCMCDKeys.length > 0) {
       logger.error("None of the keys are implemented.");
       return false;
     }
@@ -55485,27 +55827,21 @@ function CmcdModel() {
     return true;
   }
   function getCmcdParametersFromManifest() {
-    var cmcdParameters = {};
+    var cmcdParametersFromManifest = {};
     if (serviceDescriptionController) {
       var serviceDescription = serviceDescriptionController.getServiceDescriptionSettings();
-      if (settings.get().streaming.applyCMCDParameters && serviceDescription.clientDataReporting && serviceDescription.clientDataReporting.CMCDParameters) {
-        cmcdParameters = serviceDescription.clientDataReporting.CMCDParameters;
+      if (settings.get().streaming.cmcd.applyParametersFromMpd && serviceDescription.clientDataReporting && serviceDescription.clientDataReporting.cmcdParameters) {
+        cmcdParametersFromManifest = serviceDescription.clientDataReporting.cmcdParameters;
       }
     }
-    return cmcdParameters;
+    return cmcdParametersFromManifest;
   }
   function _isIncludedInRequestFilter(type) {
     var _filtersTypes;
-    var cmcdParameters = getCmcdParametersFromManifest();
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
     var includeInRequestsArray = settings.get().streaming.cmcd.includeInRequests;
-    if (cmcdParameters.version) {
-      var includeInRequests = cmcdParameters.includeInRequests;
-      includeInRequestsArray = includeInRequests ? includeInRequests.split(' ') : [CMCD_ALL_REQUESTS];
-    }
-    if (includeInRequestsArray.find(function (t) {
-      return t === CMCD_ALL_REQUESTS;
-    })) {
-      return true;
+    if (cmcdParametersFromManifest.version) {
+      includeInRequestsArray = cmcdParametersFromManifest.includeInRequests ? cmcdParametersFromManifest.includeInRequests : [DEFAULT_INCLUDE_IN_REQUESTS];
     }
     var filtersTypes = (_filtersTypes = {}, _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.INIT_SEGMENT_TYPE, 'segment'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.MEDIA_SEGMENT_TYPE, 'segment'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.XLINK_EXPANSION_TYPE, 'xlink'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.MPD_TYPE, 'mpd'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.CONTENT_STEERING_TYPE, 'steering'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.OTHER_TYPE, 'other'), _filtersTypes);
     return includeInRequestsArray.some(function (t) {
@@ -55539,13 +55875,13 @@ function CmcdModel() {
   }
   function _updateLastMediaTypeRequest(type, mediatype) {
     // Video > Audio > None
-    if (mediatype == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].VIDEO || mediatype == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) {
+    if (mediatype === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].VIDEO || mediatype === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) {
       if (!_lastMediaTypeRequest || _lastMediaTypeRequest == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) _lastMediaTypeRequest = mediatype;
     }
   }
   function _getCmcdDataForSteering(request) {
     var data = !_lastMediaTypeRequest ? _getGenericCmcdData(request) : _getCmcdDataForMediaSegment(request, _lastMediaTypeRequest);
-    data.ot = OBJECT_TYPES.OTHER;
+    data.ot = _svta_common_media_library_cmcd_CmcdObjectType__WEBPACK_IMPORTED_MODULE_11__.CmcdObjectType.OTHER;
     return data;
   }
   function _getCmcdDataForLicense(request) {
@@ -55652,13 +55988,13 @@ function CmcdModel() {
     return data;
   }
   function _getGenericCmcdData() {
-    var cmcdParameters = getCmcdParametersFromManifest();
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
     var data = {};
     var cid = settings.get().streaming.cmcd.cid ? settings.get().streaming.cmcd.cid : internalData.cid;
-    data.v = cmcdParameters.version ? cmcdParameters.version : CMCD_VERSION;
+    cid = cmcdParametersFromManifest.contentID ? cmcdParametersFromManifest.contentID : cid;
+    data.v = CMCD_VERSION;
     data.sid = settings.get().streaming.cmcd.sid ? settings.get().streaming.cmcd.sid : internalData.sid;
-    cid = cmcdParameters.contentID ? cmcdParameters.contentID : cid;
-    data.sid = cmcdParameters.sessionID ? cmcdParameters.sessionID : data.sid;
+    data.sid = cmcdParametersFromManifest.sessionID ? cmcdParametersFromManifest.sessionID : data.sid;
     data.sid = "".concat(data.sid);
     if (cid) {
       data.cid = "".concat(cid);
@@ -56224,7 +56560,7 @@ function CustomParametersModel() {
 
   /**
    * Registers a custom capabilities filter. This enables application to filter representations to use.
-   * The provided callback function shall return a boolean based on whether or not to use the representation.
+   * The provided callback function shall return a boolean or promise resolving to a boolean based on whether or not to use the representation.
    * The filters are applied in the order they are registered.
    * @param {function} filter - the custom capabilities filter callback
    */
@@ -58565,7 +58901,7 @@ function FetchLoader() {
         httpResponse.statusText = response.statusText;
         httpResponse.url = response.url;
         if (!response.ok) {
-          httpRequest.customData.onerror();
+          httpRequest.customData.onloadend();
         }
         var responseHeaders = {};
         var _iterator = _createForOfIteratorHelper(response.headers.keys()),
@@ -58645,7 +58981,6 @@ function FetchLoader() {
             }
             httpResponse.data = receivedData.buffer;
           }
-          httpRequest.customData.onload();
           httpRequest.customData.onloadend();
         }
 
@@ -58722,9 +59057,9 @@ function FetchLoader() {
           }
         }
         _read(httpRequest, httpResponse, _processResult);
-      })["catch"](function (e) {
-        if (httpRequest.customData.onerror) {
-          httpRequest.customData.onerror(e);
+      })["catch"](function () {
+        if (httpRequest.customData.onloadend) {
+          httpRequest.customData.onloadend();
         }
       });
     });
@@ -58787,10 +59122,9 @@ function FetchLoader() {
    * @private
    */
   function _read(httpRequest, httpResponse, processResult) {
-    httpRequest.customData.reader.read().then(processResult)["catch"](function (e) {
-      if (httpRequest.customData.onerror && httpResponse.status === 200) {
-        // Error, but response code is 200, trigger error
-        httpRequest.customData.onerror(e);
+    httpRequest.customData.reader.read().then(processResult)["catch"](function () {
+      if (httpRequest.customData.onloadend) {
+        httpRequest.customData.onloadend();
       }
     });
   }
@@ -58952,14 +59286,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/DashJSError.js */ "./src/streaming/vo/DashJSError.js");
 /* harmony import */ var _models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../models/CmcdModel.js */ "./src/streaming/models/CmcdModel.js");
 /* harmony import */ var _models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../models/CmsdModel.js */ "./src/streaming/models/CmsdModel.js");
-/* harmony import */ var _models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../models/ClientDataReportingModel.js */ "./src/streaming/models/ClientDataReportingModel.js");
-/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
-/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../core/Debug.js */ "./src/core/Debug.js");
-/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../core/EventBus.js */ "./src/core/EventBus.js");
-/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../core/events/Events.js */ "./src/core/events/Events.js");
-/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../../core/Settings.js */ "./src/core/Settings.js");
-/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
-/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
+/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../core/Debug.js */ "./src/core/Debug.js");
+/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../core/EventBus.js */ "./src/core/EventBus.js");
+/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../core/events/Events.js */ "./src/core/events/Events.js");
+/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../core/Settings.js */ "./src/core/Settings.js");
+/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
+/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _controllers_CommonAccessTokenController_js__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../controllers/CommonAccessTokenController.js */ "./src/streaming/controllers/CommonAccessTokenController.js");
+/* harmony import */ var _controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../controllers/ClientDataReportingController.js */ "./src/streaming/controllers/ClientDataReportingController.js");
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
@@ -59010,6 +59345,7 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 
 
 
+
 /**
  * @module HTTPLoader
  * @ignore
@@ -59025,20 +59361,29 @@ function HTTPLoader(cfg) {
   var boxParser = cfg.boxParser;
   var errors = cfg.errors;
   var requestTimeout = cfg.requestTimeout || 0;
-  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_10__["default"])(context).getInstance();
-  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_12__["default"])(context).getInstance();
-  var instance, httpRequests, delayedRequests, retryRequests, downloadErrorToRequestTypeMap, cmcdModel, cmsdModel, clientDataReportingModel, xhrLoader, fetchLoader, customParametersModel, logger;
+  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_9__["default"])(context).getInstance();
+  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_11__["default"])(context).getInstance();
+  var instance, httpRequests, delayedRequests, retryRequests, downloadErrorToRequestTypeMap, cmcdModel, cmsdModel, xhrLoader, fetchLoader, customParametersModel, commonAccessTokenController, clientDataReportingController, logger;
   function setup() {
     var _downloadErrorToReque;
-    logger = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_9__["default"])(context).getInstance().getLogger(instance);
+    logger = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_8__["default"])(context).getInstance().getLogger(instance);
     httpRequests = [];
     delayedRequests = [];
     retryRequests = [];
     cmcdModel = (0,_models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_5__["default"])(context).getInstance();
-    clientDataReportingModel = (0,_models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_7__["default"])(context).getInstance();
+    clientDataReportingController = (0,_controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_15__["default"])(context).getInstance();
     cmsdModel = (0,_models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_6__["default"])(context).getInstance();
-    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_14__["default"])(context).getInstance();
+    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_13__["default"])(context).getInstance();
+    commonAccessTokenController = (0,_controllers_CommonAccessTokenController_js__WEBPACK_IMPORTED_MODULE_14__["default"])(context).getInstance();
     downloadErrorToRequestTypeMap = (_downloadErrorToReque = {}, _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE, errors.DOWNLOAD_ERROR_ID_MANIFEST_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.XLINK_EXPANSION_TYPE, errors.DOWNLOAD_ERROR_ID_XLINK_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.INIT_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_INITIALIZATION_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.INDEX_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.BITSTREAM_SWITCHING_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.OTHER_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _downloadErrorToReque);
+  }
+  function setConfig(config) {
+    if (!config) {
+      return;
+    }
+    if (config.commonAccessTokenController) {
+      commonAccessTokenController = config.commonAccessTokenController;
+    }
   }
 
   /**
@@ -59067,17 +59412,10 @@ function HTTPLoader(cfg) {
    */
   function _internalLoad(config, remainingAttempts) {
     /**
-     * Fired when a request has completed, whether successfully (after load) or unsuccessfully (after abort or error).
+     * Fired when a request has completed, whether successfully (after load) or unsuccessfully (after abort, timeout or error).
      */
     var _onloadend = function _onloadend() {
-      // Remove the request from our list of requests
-      if (httpRequests.indexOf(httpRequest) !== -1) {
-        httpRequests.splice(httpRequests.indexOf(httpRequest), 1);
-      }
-      if (progressTimeout) {
-        clearTimeout(progressTimeout);
-        progressTimeout = null;
-      }
+      _onRequestEnd();
     };
 
     /**
@@ -59134,59 +59472,12 @@ function HTTPLoader(cfg) {
         config.progress(event);
       }
     };
-    var _oncomplete = function _oncomplete() {
-      // Update request timing info
-      requestObject.startDate = requestStartTime;
-      requestObject.endDate = new Date();
-      requestObject.firstByteDate = requestObject.firstByteDate || requestStartTime;
-      httpResponse.resourceTiming.responseEnd = requestObject.endDate.getTime();
-
-      // If enabled the ResourceTimingApi we add the corresponding information to the request object.
-      // These values are more accurate and can be used by the ThroughputController later
-      _addResourceTimingValues(httpRequest, httpResponse);
-    };
-
-    /**
-     * Fired when an XMLHttpRequest transaction completes.
-     * This includes status codes such as 404. We handle errors in the _onError function.
-     */
-    var _onload = function _onload() {
-      _oncomplete();
-      _applyResponseInterceptors(httpResponse).then(function (_httpResponse) {
-        httpResponse = _httpResponse;
-        _addHttpRequestMetric(httpRequest, httpResponse, traces);
-        if (requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE) {
-          dashMetrics.addManifestUpdate(requestObject);
-          eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__["default"].MANIFEST_LOADING_FINISHED, {
-            requestObject: requestObject
-          });
-        }
-        if (httpResponse.status >= 200 && httpResponse.status <= 299) {
-          if (config.success) {
-            config.success(httpResponse.data, httpResponse.statusText, httpResponse.url);
-          }
-          if (config.complete) {
-            config.complete(requestObject, httpResponse.statusText);
-          }
-        } else {
-          _onerror();
-        }
-      });
-    };
 
     /**
      * Fired when a request has been aborted, for example because the program called XMLHttpRequest.abort().
      */
     var _onabort = function _onabort() {
-      _oncomplete();
-      _addHttpRequestMetric(httpRequest, httpResponse, traces);
-      if (progressTimeout) {
-        clearTimeout(progressTimeout);
-        progressTimeout = null;
-      }
-      if (config.abort) {
-        config.abort(requestObject);
-      }
+      _onRequestEnd(true);
     };
 
     /**
@@ -59194,7 +59485,6 @@ function HTTPLoader(cfg) {
      * @param event
      */
     var _ontimeout = function _ontimeout(event) {
-      _oncomplete();
       var timeoutMessage;
       // We know how much we already downloaded by looking at the timeout event
       if (event.lengthComputable) {
@@ -59204,33 +59494,76 @@ function HTTPLoader(cfg) {
         timeoutMessage = 'Request timeout: non-computable download size';
       }
       logger.warn(timeoutMessage);
-      _addHttpRequestMetric(httpRequest, httpResponse, traces);
-      _retriggerRequest();
     };
+    var _onRequestEnd = function _onRequestEnd() {
+      var aborted = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+      // Remove the request from our list of requests
+      if (httpRequests.indexOf(httpRequest) !== -1) {
+        httpRequests.splice(httpRequests.indexOf(httpRequest), 1);
+      }
+      if (progressTimeout) {
+        clearTimeout(progressTimeout);
+        progressTimeout = null;
+      }
+      commonAccessTokenController.processResponseHeaders(httpResponse);
+      _updateRequestTimingInfo();
+      _updateResourceTimingInfo();
+      _applyResponseInterceptors(httpResponse).then(function (_httpResponse) {
+        httpResponse = _httpResponse;
+        _addHttpRequestMetric(httpRequest, httpResponse, traces);
 
-    /**
-     * Fired when the request encountered an error.
-     */
-    var _onerror = function _onerror() {
-      // If we get a 404 to a media segment we should check the client clock again and perform a UTC sync in the background.
-      try {
-        if (httpResponse.status === 404 && settings.get().streaming.utcSynchronization.enableBackgroundSyncAfterSegmentDownloadError && requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE) {
-          // Only trigger a sync if the loading failed for the first time
-          var initialNumberOfAttempts = mediaPlayerModel.getRetryAttemptsForType(_vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE);
-          if (initialNumberOfAttempts === remainingAttempts) {
-            eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__["default"].ATTEMPT_BACKGROUND_SYNC);
+        // Ignore aborted requests
+        if (aborted) {
+          if (config.abort) {
+            config.abort(requestObject);
           }
+          return;
         }
-      } catch (e) {}
-      _retriggerRequest();
+        if (requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE) {
+          dashMetrics.addManifestUpdate(requestObject);
+          eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__["default"].MANIFEST_LOADING_FINISHED, {
+            requestObject: requestObject
+          });
+        }
+        if (httpResponse.status >= 200 && httpResponse.status <= 299 && httpResponse.data) {
+          if (config.success) {
+            config.success(httpResponse.data, httpResponse.statusText, httpResponse.url);
+          }
+          if (config.complete) {
+            config.complete(requestObject, httpResponse.statusText);
+          }
+        } else {
+          // If we get a 404 to a media segment we should check the client clock again and perform a UTC sync in the background.
+          try {
+            if (httpResponse.status === 404 && settings.get().streaming.utcSynchronization.enableBackgroundSyncAfterSegmentDownloadError && requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE) {
+              // Only trigger a sync if the loading failed for the first time
+              var initialNumberOfAttempts = mediaPlayerModel.getRetryAttemptsForType(_vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE);
+              if (initialNumberOfAttempts === remainingAttempts) {
+                eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__["default"].ATTEMPT_BACKGROUND_SYNC);
+              }
+            }
+          } catch (e) {}
+          _retriggerRequest();
+        }
+      });
+    };
+    var _updateRequestTimingInfo = function _updateRequestTimingInfo() {
+      requestObject.startDate = requestStartTime;
+      requestObject.endDate = new Date();
+      requestObject.firstByteDate = requestObject.firstByteDate || requestStartTime;
+    };
+    var _updateResourceTimingInfo = function _updateResourceTimingInfo() {
+      httpResponse.resourceTiming.responseEnd = Date.now();
+
+      // If enabled the ResourceTimingApi we add the corresponding information to the request object.
+      // These values are more accurate and can be used by the ThroughputController later
+      _addResourceTimingValues(httpRequest, httpResponse);
     };
     var _loadRequest = function _loadRequest(loader, httpRequest, httpResponse) {
       return new Promise(function (resolve) {
         _applyRequestInterceptors(httpRequest).then(function (_httpRequest) {
           httpRequest = _httpRequest;
-          httpRequest.customData.onload = _onload;
           httpRequest.customData.onloadend = _onloadend;
-          httpRequest.customData.onerror = _onloadend;
           httpRequest.customData.onprogress = _onprogress;
           httpRequest.customData.onabort = _onabort;
           httpRequest.customData.ontimeout = _ontimeout;
@@ -59324,7 +59657,8 @@ function HTTPLoader(cfg) {
       resourceTiming: {
         startTime: Date.now(),
         encodedBodySize: 0
-      }
+      },
+      status: 0
     };
 
     // Adds the ability to delay single fragment loading time to control buffer.
@@ -59352,7 +59686,7 @@ function HTTPLoader(cfg) {
           httpRequests.push(delayedRequest.httpRequest);
           _loadRequest(loader, delayedRequest.httpRequest, delayedRequest.httpResponse);
         } catch (e) {
-          delayedRequest.httpRequest.onerror();
+          delayedRequest.httpRequest.onloadend();
         }
       }, requestObject.delayLoadingTime - now);
       return Promise.resolve();
@@ -59457,13 +59791,13 @@ function HTTPLoader(cfg) {
         });
       }
       loader = fetchLoader;
-      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].FILE_LOADER_TYPES.FETCH;
+      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].FILE_LOADER_TYPES.FETCH;
     } else {
       if (!xhrLoader) {
         xhrLoader = (0,_XHRLoader_js__WEBPACK_IMPORTED_MODULE_0__["default"])(context).create();
       }
       loader = xhrLoader;
-      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].FILE_LOADER_TYPES.XHR;
+      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].FILE_LOADER_TYPES.XHR;
     }
     return {
       loader: loader,
@@ -59477,20 +59811,7 @@ function HTTPLoader(cfg) {
    * @private
    */
   function _updateRequestUrlAndHeaders(request) {
-    var _request$mediaInfo;
-    var currentServiceLocation = request === null || request === void 0 ? void 0 : request.serviceLocation;
-    var currentAdaptationSetId = request === null || request === void 0 || (_request$mediaInfo = request.mediaInfo) === null || _request$mediaInfo === void 0 || (_request$mediaInfo = _request$mediaInfo.id) === null || _request$mediaInfo === void 0 ? void 0 : _request$mediaInfo.toString();
-    var isIncludedFilters = clientDataReportingModel.serviceLocationIncluded(request.type, currentServiceLocation) && clientDataReportingModel.adaptationSetIncluded(currentAdaptationSetId);
-    if (isIncludedFilters && cmcdModel.isCmcdEnabled()) {
-      var cmcdParameters = cmcdModel.getCmcdParametersFromManifest();
-      var cmcdMode = cmcdParameters.mode ? cmcdParameters.mode : settings.get().streaming.cmcd.mode;
-      if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].CMCD_MODE_QUERY) {
-        var additionalQueryParameter = _getAdditionalQueryParameter(request);
-        request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__["default"].addAditionalQueryParameterToUrl(request.url, additionalQueryParameter);
-      } else if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].CMCD_MODE_HEADER) {
-        request.headers = Object.assign(request.headers, cmcdModel.getHeaderParameters(request));
-      }
-    }
+    _updateRequestUrlAndHeadersWithCMCD(request);
 
     // Add queryParams that came from pathway cloning
     if (request.queryParams) {
@@ -59500,7 +59821,35 @@ function HTTPLoader(cfg) {
           value: request.queryParams[key]
         };
       });
-      request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__["default"].addAditionalQueryParameterToUrl(request.url, queryParams);
+      request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__["default"].addAditionalQueryParameterToUrl(request.url, queryParams);
+    }
+
+    // Add headers from CommonAccessToken
+    var commonAccessToken = commonAccessTokenController.getCommonAccessTokenForUrl(request.url);
+    if (commonAccessToken) {
+      request.headers[_constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].COMMON_ACCESS_TOKEN_HEADER] = commonAccessToken;
+    }
+  }
+
+  /**
+   * Updates the request url and headers with CMCD data
+   * @param request
+   * @private
+   */
+  function _updateRequestUrlAndHeadersWithCMCD(request) {
+    var _request$mediaInfo;
+    var currentServiceLocation = request === null || request === void 0 ? void 0 : request.serviceLocation;
+    var currentAdaptationSetId = request === null || request === void 0 || (_request$mediaInfo = request.mediaInfo) === null || _request$mediaInfo === void 0 || (_request$mediaInfo = _request$mediaInfo.id) === null || _request$mediaInfo === void 0 ? void 0 : _request$mediaInfo.toString();
+    var isIncludedFilters = clientDataReportingController.isServiceLocationIncluded(request.type, currentServiceLocation) && clientDataReportingController.isAdaptationsIncluded(currentAdaptationSetId);
+    if (isIncludedFilters && cmcdModel.isCmcdEnabled()) {
+      var cmcdParameters = cmcdModel.getCmcdParametersFromManifest();
+      var cmcdMode = cmcdParameters.mode ? cmcdParameters.mode : settings.get().streaming.cmcd.mode;
+      if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].CMCD_MODE_QUERY) {
+        var additionalQueryParameter = _getAdditionalQueryParameter(request);
+        request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__["default"].addAditionalQueryParameterToUrl(request.url, additionalQueryParameter);
+      } else if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].CMCD_MODE_HEADER) {
+        request.headers = Object.assign(request.headers, cmcdModel.getHeaderParameters(request));
+      }
     }
   }
 
@@ -59554,7 +59903,7 @@ function HTTPLoader(cfg) {
       // abort will trigger onloadend which we don't want
       // when deliberately aborting inflight requests -
       // set them to undefined so they are not called
-      reqData.onloadend = reqData.onerror = reqData.onprogress = undefined;
+      reqData.onloadend = reqData.onprogress = undefined;
       if (reqData.abort) {
         reqData.abort();
       }
@@ -59563,7 +59912,8 @@ function HTTPLoader(cfg) {
   }
   instance = {
     load: load,
-    abort: abort
+    abort: abort,
+    setConfig: setConfig
   };
   setup();
   return instance;
@@ -59828,16 +60178,14 @@ function XHRLoader() {
     }
     xhr.withCredentials = httpRequest.credentials === 'include';
     xhr.timeout = httpRequest.timeout;
-    xhr.onload = function (e) {
+    xhr.onload = function () {
       httpResponse.url = this.responseURL;
       httpResponse.status = this.status;
       httpResponse.statusText = this.statusText;
       httpResponse.headers = _core_Utils_js__WEBPACK_IMPORTED_MODULE_1__["default"].parseHttpHeaders(this.getAllResponseHeaders());
       httpResponse.data = this.response;
-      httpRequest.customData.onload(e);
     };
     xhr.onloadend = httpRequest.customData.onloadend;
-    xhr.onerror = httpRequest.customData.onerror;
     xhr.onprogress = httpRequest.customData.onprogress;
     xhr.onabort = httpRequest.customData.onabort;
     xhr.ontimeout = httpRequest.customData.ontimeout;
@@ -61675,6 +62023,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _servers_Widevine_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./../servers/Widevine.js */ "./src/streaming/protection/servers/Widevine.js");
 /* harmony import */ var _servers_ClearKey_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./../servers/ClearKey.js */ "./src/streaming/protection/servers/ClearKey.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -61705,6 +62054,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -62055,7 +62405,7 @@ function ProtectionKeyController() {
   return instance;
 }
 ProtectionKeyController.__dashjs_factory_name = 'ProtectionKeyController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ProtectionKeyController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_10__["default"].getSingletonFactory(ProtectionKeyController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -62071,6 +62421,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -62101,6 +62452,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -62202,7 +62554,7 @@ function KeySystemClearKey(config) {
   return instance;
 }
 KeySystemClearKey.__dashjs_factory_name = 'KeySystemClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(KeySystemClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -62216,6 +62568,7 @@ KeySystemClearKey.__dashjs_factory_name = 'KeySystemClearKey';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -62253,6 +62606,7 @@ __webpack_require__.r(__webpack_exports__);
  * @class
  * @implements KeySystem
  */
+
 
 
 var uuid = '9a04f079-9840-4286-ab92-e65be0885f95';
@@ -62476,7 +62830,7 @@ function KeySystemPlayReady(config) {
   return instance;
 }
 KeySystemPlayReady.__dashjs_factory_name = 'KeySystemPlayReady';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemPlayReady)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(KeySystemPlayReady)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -62492,6 +62846,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -62522,6 +62877,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -62597,7 +62953,7 @@ function KeySystemW3CClearKey(config) {
   return instance;
 }
 KeySystemW3CClearKey.__dashjs_factory_name = 'KeySystemW3CClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemW3CClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(KeySystemW3CClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -62611,6 +62967,7 @@ KeySystemW3CClearKey.__dashjs_factory_name = 'KeySystemW3CClearKey';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -62648,6 +63005,7 @@ __webpack_require__.r(__webpack_exports__);
  * @class
  * @implements MediaPlayer.dependencies.protection.KeySystem
  */
+
 
 
 
@@ -62689,7 +63047,7 @@ function KeySystemWidevine(config) {
   return instance;
 }
 KeySystemWidevine.__dashjs_factory_name = 'KeySystemWidevine';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemWidevine)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(KeySystemWidevine)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -62857,6 +63215,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeySystemConfiguration_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeySystemConfiguration.js */ "./src/streaming/protection/vo/KeySystemConfiguration.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
 /* harmony import */ var _errors_ProtectionErrors_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../errors/ProtectionErrors.js */ "./src/streaming/protection/errors/ProtectionErrors.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -62896,6 +63255,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -63282,7 +63642,7 @@ function ProtectionModel_01b(config) {
   return instance;
 }
 ProtectionModel_01b.__dashjs_factory_name = 'ProtectionModel_01b';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_01b)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_01b)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -63301,6 +63661,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyMessage_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeyMessage.js */ "./src/streaming/protection/vo/KeyMessage.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -63340,6 +63701,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -63851,7 +64213,7 @@ function ProtectionModel_21Jan2015(config) {
   return instance;
 }
 ProtectionModel_21Jan2015.__dashjs_factory_name = 'ProtectionModel_21Jan2015';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_21Jan2015)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_21Jan2015)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -63870,6 +64232,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyMessage_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeyMessage.js */ "./src/streaming/protection/vo/KeyMessage.js");
 /* harmony import */ var _vo_KeySystemConfiguration_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemConfiguration.js */ "./src/streaming/protection/vo/KeySystemConfiguration.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -63909,6 +64272,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -64250,7 +64614,7 @@ function ProtectionModel_3Feb2014(config) {
   return instance;
 }
 ProtectionModel_3Feb2014.__dashjs_factory_name = 'ProtectionModel_3Feb2014';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_3Feb2014)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_3Feb2014)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -64264,6 +64628,7 @@ ProtectionModel_3Feb2014.__dashjs_factory_name = 'ProtectionModel_3Feb2014';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyPair_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/KeyPair.js */ "./src/streaming/protection/vo/KeyPair.js");
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -64306,6 +64671,7 @@ __webpack_require__.r(__webpack_exports__);
  */
 
 
+
 function ClearKey() {
   var instance;
   function getServerURLFromMessage(url /* message, messageType*/) {
@@ -64345,7 +64711,7 @@ function ClearKey() {
   return instance;
 }
 ClearKey.__dashjs_factory_name = 'ClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(ClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -64358,6 +64724,7 @@ ClearKey.__dashjs_factory_name = 'ClearKey';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -64395,6 +64762,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements LicenseServer
  * @class
  */
+
 
 
 function DRMToday(config) {
@@ -64452,7 +64820,7 @@ function DRMToday(config) {
   return instance;
 }
 DRMToday.__dashjs_factory_name = 'DRMToday';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(DRMToday)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getSingletonFactory(DRMToday)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -64608,6 +64976,7 @@ PlayReady.__dashjs_factory_name = 'PlayReady';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -64638,6 +65007,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -64671,7 +65042,7 @@ function Widevine() {
   return instance;
 }
 Widevine.__dashjs_factory_name = 'Widevine';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(Widevine)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(Widevine)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -67680,7 +68051,7 @@ function ThroughputRule(config) {
           switchRequest.reason = {
             throughput: throughput,
             latency: latency,
-            message: "[ThroughputRule]: Switching to Representation with bitrate ".concat(switchRequest.representation.bitrateInKbit, " kbit/s. Throughput: ").concat(throughput)
+            message: "[ThroughputRule]: Switching to Representation with bitrate ".concat(switchRequest.representation ? switchRequest.representation.bitrateInKbit : 'n/a', " kbit/s. Throughput: ").concat(throughput)
           };
           scheduleController.setTimeToLoadDelay(0);
         }
@@ -72756,13 +73127,13 @@ function Capabilities() {
 
   /**
    * Check if a specific EssentialProperty is supported
-   * @param {object} ep
+   * @param {DescriptorType} ep
    * @return {boolean}
    */
   function supportsEssentialProperty(ep) {
     var supportedEssentialProps = settings.get().streaming.capabilities.supportedEssentialProperties;
     try {
-      return supportedEssentialProps.indexOf(ep.schemeIdUri) !== -1;
+      return ep.inArray(supportedEssentialProps);
     } catch (e) {
       return true;
     }
@@ -72835,8 +73206,10 @@ function CapabilitiesFilter() {
         if (settings.get().streaming.capabilities.filterUnsupportedEssentialProperties) {
           _filterUnsupportedEssentialProperties(manifest);
         }
-        _applyCustomFilters(manifest);
-        resolve();
+      }).then(function () {
+        return _applyCustomFilters(manifest);
+      }).then(function () {
+        return resolve();
       })["catch"](function () {
         resolve();
       });
@@ -72968,23 +73341,75 @@ function CapabilitiesFilter() {
     });
   }
   function _applyCustomFilters(manifest) {
-    var customCapabilitiesFilters = customParametersModel.getCustomCapabilitiesFilters();
-    if (!customCapabilitiesFilters || customCapabilitiesFilters.length === 0 || !manifest || !manifest.Period || manifest.Period.length === 0) {
-      return;
+    if (!manifest || !manifest.Period || manifest.Period.length === 0) {
+      return Promise.resolve();
     }
+    var promises = [];
     manifest.Period.forEach(function (period) {
-      period.AdaptationSet = period.AdaptationSet.filter(function (as) {
-        if (!as.Representation || as.Representation.length === 0) {
-          return true;
-        }
-        as.Representation = as.Representation.filter(function (representation) {
-          return !customCapabilitiesFilters.some(function (customFilter) {
-            return !customFilter(representation);
-          });
+      promises.push(_applyCustomFiltersAdaptationSetsOfPeriod(period));
+    });
+    return Promise.all(promises);
+  }
+  function _applyCustomFiltersAdaptationSetsOfPeriod(period) {
+    return new Promise(function (resolve) {
+      if (!period || !period.AdaptationSet || period.AdaptationSet.length === 0) {
+        resolve();
+        return;
+      }
+      var promises = [];
+      period.AdaptationSet.forEach(function (as) {
+        promises.push(_applyCustomFiltersRepresentationsOfAdaptation(as));
+      });
+      Promise.all(promises).then(function () {
+        period.AdaptationSet = period.AdaptationSet.filter(function (as) {
+          return as.Representation && as.Representation.length > 0;
         });
-        return as.Representation && as.Representation.length > 0;
+        resolve();
+      })["catch"](function () {
+        resolve();
       });
     });
+  }
+  function _applyCustomFiltersRepresentationsOfAdaptation(as) {
+    return new Promise(function (resolve) {
+      if (!as.Representation || as.Representation.length === 0) {
+        resolve();
+        return;
+      }
+      var promises = [];
+      as.Representation.forEach(function (rep) {
+        promises.push(_applyCustomFiltersRepresentation(rep));
+      });
+      Promise.all(promises).then(function (supported) {
+        as.Representation = as.Representation.filter(function (rep, i) {
+          var isReprSupported = supported[i].every(function (s) {
+            return s;
+          });
+          if (!isReprSupported) {
+            logger.debug('[Stream] Representation ' + rep.id + ' has been removed because of unsupported CustomFilter');
+          }
+          return isReprSupported;
+        });
+        resolve();
+      })["catch"](function (err) {
+        logger.warn('[Stream] at least one promise rejected in CustomFilter with error: ', err);
+        resolve();
+      });
+    });
+  }
+  function _applyCustomFiltersRepresentation(rep) {
+    var promises = [];
+    var customCapabilitiesFilters = customParametersModel.getCustomCapabilitiesFilters();
+    if (!customCapabilitiesFilters || customCapabilitiesFilters.length === 0) {
+      promises.push(Promise.resolve(true));
+    } else {
+      customCapabilitiesFilters.forEach(function (customFilter) {
+        promises.push(new Promise(function (resolve) {
+          return resolve(customFilter(rep));
+        }));
+      });
+    }
+    return Promise.all(promises);
   }
   instance = {
     setConfig: setConfig,

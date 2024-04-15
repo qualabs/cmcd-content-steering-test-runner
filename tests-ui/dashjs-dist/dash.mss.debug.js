@@ -1829,6 +1829,7 @@ var EventsBase = /*#__PURE__*/function () {
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _streaming_vo_FragmentRequest_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../streaming/vo/FragmentRequest.js */ "./src/streaming/vo/FragmentRequest.js");
 /* harmony import */ var _streaming_vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../streaming/vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -1859,6 +1860,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -1997,7 +1999,7 @@ function MssFragmentInfoController(config) {
   return instance;
 }
 MssFragmentInfoController.__dashjs_factory_name = 'MssFragmentInfoController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MssFragmentInfoController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getClassFactory(MssFragmentInfoController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -3425,6 +3427,7 @@ var mssErrors = new MssErrors();
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _externals_BigInteger_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../externals/BigInteger.js */ "./externals/BigInteger.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -3461,6 +3464,7 @@ __webpack_require__.r(__webpack_exports__);
  * @ignore
  * @param {Object} config object
  */
+
 
 
 function MssParser(config) {
@@ -4184,7 +4188,7 @@ function MssParser(config) {
   return instance;
 }
 MssParser.__dashjs_factory_name = 'MssParser';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(MssParser)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(MssParser)); /* jshint ignore:line */
 
 /***/ }),
 

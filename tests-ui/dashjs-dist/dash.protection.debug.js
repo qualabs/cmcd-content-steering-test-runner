@@ -1860,6 +1860,9 @@ var Utils = /*#__PURE__*/function () {
         return src; // anything
       }
 
+      if (src instanceof RegExp) {
+        return new RegExp(src);
+      }
       var r;
       if (src instanceof Array) {
         // array
@@ -1971,6 +1974,16 @@ var Utils = /*#__PURE__*/function () {
         return relativePath;
       } catch (e) {
         return targetUrl;
+      }
+    }
+  }, {
+    key: "getHostFromUrl",
+    value: function getHostFromUrl(urlString) {
+      try {
+        var url = new URL(urlString);
+        return url.host;
+      } catch (e) {
+        return null;
       }
     }
   }, {
@@ -2207,10 +2220,8 @@ __webpack_require__.r(__webpack_exports__);
   BYTE_RANGE: 'byteRange',
   CENC_DEFAULT_KID: 'cenc:default_KID',
   CLIENT_DATA_REPORTING: 'ClientDataReporting',
-  CLIENT_DATA_REPORTING_AS_ARRAY: 'ClientDataReporting_asArray',
   CLIENT_REQUIREMENT: 'clientRequirement',
   CMCD_PARAMETERS: 'CMCDParameters',
-  CMCD_PARAMETERS_AS_ARRAY: 'CMCDParameters_asArray',
   CODECS: 'codecs',
   CODEC_PRIVATE_DATA: 'codecPrivateData',
   CODING_DEPENDENCY: 'codingDependency',
@@ -2543,17 +2554,17 @@ __webpack_require__.r(__webpack_exports__);
    */
   CMCD_MODE_HEADER: 'header',
   /**
-   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
   CMCD_AVAILABLE_KEYS: ['br', 'd', 'ot', 'tb', 'bl', 'dl', 'mtp', 'nor', 'nrr', 'su', 'bs', 'rtp', 'cid', 'pr', 'sf', 'sid', 'st', 'v'],
   /**
-   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
-  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering'],
+  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering', 'other'],
   INITIALIZE: 'initialize',
   TEXT_SHOWING: 'showing',
   TEXT_HIDDEN: 'hidden',
@@ -2566,8 +2577,12 @@ __webpack_require__.r(__webpack_exports__);
   START_TIME: 'starttime',
   SERVICE_DESCRIPTION_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:scope:2019',
   SUPPLEMENTAL_PROPERTY_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:critical:2019',
+  CTA_5004_2023_SCHEME: 'urn:mpeg:dash:cta-5004:2023',
   THUMBNAILS_SCHEME_ID_URIS: ['http://dashif.org/thumbnail_tile', 'http://dashif.org/guidelines/thumbnail_tile'],
   FONT_DOWNLOAD_DVB_SCHEME: 'urn:dvb:dash:fontdownload:2014',
+  COLOUR_PRIMARIES_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:ColourPrimaries',
+  MATRIX_COEFFICIENTS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:MatrixCoefficients',
+  TRANSFER_CHARACTERISTICS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:TransferCharacteristics',
   XML: 'XML',
   ARRAY_BUFFER: 'ArrayBuffer',
   DVB_REPORTING_URL: 'dvb:reportingUrl',
@@ -2625,7 +2640,8 @@ __webpack_require__.r(__webpack_exports__);
    *  @memberof Constants#
    *  @static
    */
-  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3'
+  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3',
+  COMMON_ACCESS_TOKEN_HEADER: 'common-access-token'
 });
 
 /***/ }),
@@ -4285,6 +4301,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _servers_Widevine_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./../servers/Widevine.js */ "./src/streaming/protection/servers/Widevine.js");
 /* harmony import */ var _servers_ClearKey_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./../servers/ClearKey.js */ "./src/streaming/protection/servers/ClearKey.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -4315,6 +4332,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -4665,7 +4683,7 @@ function ProtectionKeyController() {
   return instance;
 }
 ProtectionKeyController.__dashjs_factory_name = 'ProtectionKeyController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ProtectionKeyController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_10__["default"].getSingletonFactory(ProtectionKeyController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -4681,6 +4699,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -4711,6 +4730,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -4812,7 +4832,7 @@ function KeySystemClearKey(config) {
   return instance;
 }
 KeySystemClearKey.__dashjs_factory_name = 'KeySystemClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(KeySystemClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -4826,6 +4846,7 @@ KeySystemClearKey.__dashjs_factory_name = 'KeySystemClearKey';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -4863,6 +4884,7 @@ __webpack_require__.r(__webpack_exports__);
  * @class
  * @implements KeySystem
  */
+
 
 
 var uuid = '9a04f079-9840-4286-ab92-e65be0885f95';
@@ -5086,7 +5108,7 @@ function KeySystemPlayReady(config) {
   return instance;
 }
 KeySystemPlayReady.__dashjs_factory_name = 'KeySystemPlayReady';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemPlayReady)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(KeySystemPlayReady)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5102,6 +5124,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5132,6 +5155,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -5207,7 +5231,7 @@ function KeySystemW3CClearKey(config) {
   return instance;
 }
 KeySystemW3CClearKey.__dashjs_factory_name = 'KeySystemW3CClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemW3CClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_4__["default"].getSingletonFactory(KeySystemW3CClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5221,6 +5245,7 @@ KeySystemW3CClearKey.__dashjs_factory_name = 'KeySystemW3CClearKey';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _CommonEncryption_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../CommonEncryption.js */ "./src/streaming/protection/CommonEncryption.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5258,6 +5283,7 @@ __webpack_require__.r(__webpack_exports__);
  * @class
  * @implements MediaPlayer.dependencies.protection.KeySystem
  */
+
 
 
 
@@ -5299,7 +5325,7 @@ function KeySystemWidevine(config) {
   return instance;
 }
 KeySystemWidevine.__dashjs_factory_name = 'KeySystemWidevine';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(KeySystemWidevine)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(KeySystemWidevine)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5467,6 +5493,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeySystemConfiguration_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeySystemConfiguration.js */ "./src/streaming/protection/vo/KeySystemConfiguration.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
 /* harmony import */ var _errors_ProtectionErrors_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../errors/ProtectionErrors.js */ "./src/streaming/protection/errors/ProtectionErrors.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5506,6 +5533,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -5892,7 +5920,7 @@ function ProtectionModel_01b(config) {
   return instance;
 }
 ProtectionModel_01b.__dashjs_factory_name = 'ProtectionModel_01b';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_01b)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_01b)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -5911,6 +5939,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyMessage_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeyMessage.js */ "./src/streaming/protection/vo/KeyMessage.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -5950,6 +5979,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -6461,7 +6491,7 @@ function ProtectionModel_21Jan2015(config) {
   return instance;
 }
 ProtectionModel_21Jan2015.__dashjs_factory_name = 'ProtectionModel_21Jan2015';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_21Jan2015)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_21Jan2015)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6480,6 +6510,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyMessage_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/KeyMessage.js */ "./src/streaming/protection/vo/KeyMessage.js");
 /* harmony import */ var _vo_KeySystemConfiguration_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../vo/KeySystemConfiguration.js */ "./src/streaming/protection/vo/KeySystemConfiguration.js");
 /* harmony import */ var _vo_KeySystemAccess_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../vo/KeySystemAccess.js */ "./src/streaming/protection/vo/KeySystemAccess.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6519,6 +6550,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements ProtectionModel
  * @class
  */
+
 
 
 
@@ -6860,7 +6892,7 @@ function ProtectionModel_3Feb2014(config) {
   return instance;
 }
 ProtectionModel_3Feb2014.__dashjs_factory_name = 'ProtectionModel_3Feb2014';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(ProtectionModel_3Feb2014)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_7__["default"].getClassFactory(ProtectionModel_3Feb2014)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6874,6 +6906,7 @@ ProtectionModel_3Feb2014.__dashjs_factory_name = 'ProtectionModel_3Feb2014';
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_KeyPair_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../vo/KeyPair.js */ "./src/streaming/protection/vo/KeyPair.js");
 /* harmony import */ var _vo_ClearKeyKeySet_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/ClearKeyKeySet.js */ "./src/streaming/protection/vo/ClearKeyKeySet.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -6916,6 +6949,7 @@ __webpack_require__.r(__webpack_exports__);
  */
 
 
+
 function ClearKey() {
   var instance;
   function getServerURLFromMessage(url /* message, messageType*/) {
@@ -6955,7 +6989,7 @@ function ClearKey() {
   return instance;
 }
 ClearKey.__dashjs_factory_name = 'ClearKey';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(ClearKey)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(ClearKey)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -6968,6 +7002,7 @@ ClearKey.__dashjs_factory_name = 'ClearKey';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _constants_ProtectionConstants_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../constants/ProtectionConstants.js */ "./src/streaming/constants/ProtectionConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -7005,6 +7040,7 @@ __webpack_require__.r(__webpack_exports__);
  * @implements LicenseServer
  * @class
  */
+
 
 
 function DRMToday(config) {
@@ -7062,7 +7098,7 @@ function DRMToday(config) {
   return instance;
 }
 DRMToday.__dashjs_factory_name = 'DRMToday';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(DRMToday)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getSingletonFactory(DRMToday)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -7218,6 +7254,7 @@ PlayReady.__dashjs_factory_name = 'PlayReady';
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -7248,6 +7285,8 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+
 
 /**
  * @ignore
@@ -7281,7 +7320,7 @@ function Widevine() {
   return instance;
 }
 Widevine.__dashjs_factory_name = 'Widevine';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(Widevine)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(Widevine)); /* jshint ignore:line */
 
 /***/ }),
 

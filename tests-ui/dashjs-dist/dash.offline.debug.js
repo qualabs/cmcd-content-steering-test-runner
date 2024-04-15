@@ -8029,6 +8029,7 @@ function urlToRelativePath(url, base) {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   XML_ENTITIES: function() { return /* binding */ XML_ENTITIES; },
 /* harmony export */   filter: function() { return /* binding */ filter; },
 /* harmony export */   getElementById: function() { return /* binding */ getElementById; },
 /* harmony export */   getElementsByClassName: function() { return /* binding */ getElementsByClassName; },
@@ -8036,7 +8037,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   simplify: function() { return /* binding */ simplify; },
 /* harmony export */   simplifyLostLess: function() { return /* binding */ simplifyLostLess; },
 /* harmony export */   stringify: function() { return /* binding */ stringify; },
-/* harmony export */   toContentString: function() { return /* binding */ toContentString; }
+/* harmony export */   toContentString: function() { return /* binding */ toContentString; },
+/* harmony export */   translateEntitiesAndCharacterReferences: function() { return /* binding */ translateEntitiesAndCharacterReferences; }
 /* harmony export */ });
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
@@ -8084,6 +8086,64 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {boolean} [simplify]
  * @property {(a: tNode, b: tNode) => boolean} [filter]
  */
+
+/**
+ * Predefined general entities used in XML
+ * See https://www.w3.org/TR/xml/#sec-predefined-ent
+ */
+var XML_ENTITIES = {
+  '&amp;': '&',
+  '&gt;': '>',
+  '&lt;': '<',
+  '&quot;': '"',
+  '&apos;': "'"
+};
+
+/**
+ * Translates XML predefined entities and character references to their respective characters.
+ * @param {Object} entitiesList
+ * @param {String} str
+ * @returns {String}
+ */
+function translateEntitiesAndCharacterReferences(entitiesList, str) {
+  var entitySplit = str.split(/(&[#a-zA-Z0-9]+;)/);
+  if (entitySplit.length <= 1) {
+    // No entities. Skip the rest of the function.
+    return str;
+  }
+  for (var i = 1; i < entitySplit.length; i += 2) {
+    var reference = entitySplit[i];
+
+    /*
+     * Check if it is a character reference of the form
+     * /&#[0-9]+;/ - Encoded in decimal, or
+     * /&#x[0-9a-fA-F]+;/ - Encoded in hexadecimal
+     * See https://www.w3.org/TR/xml/#sec-references
+     */
+    if (reference.charAt(1) === '#') {
+      var code = void 0;
+      if (reference.charAt(2) === 'x') {
+        // Hexadecimal
+        code = parseInt(reference.substring(3, reference.length - 1), 16);
+      } else {
+        // Decimal
+        code = parseInt(reference.substring(2, reference.length - 1), 10);
+      }
+
+      // Translate into string according to ISO/IEC 10646
+      if (!isNaN(code) && code >= 0 && code <= 0x10FFFF) {
+        entitySplit[i] = String.fromCodePoint(code);
+      }
+    }
+    /*
+     * Translate entity references using a dictionary.
+     */else if (entitiesList.hasOwnProperty(reference)) {
+      entitySplit[i] = entitiesList[reference];
+    }
+  }
+  return entitySplit.join('');
+}
+;
 
 /**
  * parseXML / html into a DOM Object. with no validation and some failur tolerance
@@ -8224,7 +8284,7 @@ function parse(S, options) {
     if (tagName === 'S') {
       return parseInt(value);
     }
-    var attrValue = value;
+    var attrValue = translateEntitiesAndCharacterReferences(XML_ENTITIES, value);
     attrMatchers.forEach(function (matcher) {
       if (matcher.test(tagName, attrName, value)) {
         attrValue = matcher.converter(value);
@@ -8241,7 +8301,7 @@ function parse(S, options) {
     var start = pos;
     pos = S.indexOf(openBracket, pos) - 1;
     if (pos === -2) pos = S.length;
-    return S.slice(start, pos + 1);
+    return translateEntitiesAndCharacterReferences(XML_ENTITIES, S.slice(start, pos + 1));
   }
   /**
    *    returns text until the first nonAlphabetic letter
@@ -9286,7 +9346,13 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  *            enableManifestTimescaleMismatchFix: false,
  *            capabilities: {
  *               filterUnsupportedEssentialProperties: true,
- *               supportedEssentialProperties: Constants.THUMBNAILS_SCHEME_ID_URIS,
+ *               supportedEssentialProperties: [
+                    { schemeIdUri: Constants.FONT_DOWNLOAD_DVB_SCHEME },
+                    { schemeIdUri: Constants.COLOUR_PRIMARIES_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.MATRIX_COEFFICIENTS_SCHEME_ID_URI, value: /5|6/ },
+                    { schemeIdUri: Constants.TRANSFER_CHARACTERISTICS_SCHEME_ID_URI, value: '6' },
+                    ...Constants.THUMBNAILS_SCHEME_ID_URIS.map(ep => { return { 'schemeIdUri': ep }; })
+                ],
  *               useMediaCapabilitiesApi: false
  *            },
  *            timeShiftBuffer: {
@@ -9862,7 +9928,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @typedef {Object} Capabilities
  * @property {boolean} [filterUnsupportedEssentialProperties=true]
  * Enable to filter all the AdaptationSets and Representations which contain an unsupported \<EssentialProperty\> element.
- * @property {Array.<string>} [supportedEssentialProperties=Constants.THUMBNAILS_SCHEME_ID_URIS]
+ * @property {Array.<string>} [supportedEssentialProperties]
  * List of supported \<EssentialProperty\> elements
  * @property {boolean} [useMediaCapabilitiesApi=false]
  * Enable to use the MediaCapabilities API to check whether codecs are supported. If disabled MSE.isTypeSupported will be used instead.
@@ -10060,7 +10126,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {Array.<string>} [includeInRequests]
  * Specifies which HTTP GET requests shall carry parameters.
  * 
- * If not specified this value defaults to ['mpd', 'segment', 'other'].
+ * If not specified this value defaults to ['segment'].
  */
 
 /**
@@ -10104,9 +10170,9 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  * @property {boolean} [applyProducerReferenceTime=true]
  * Set to true if dash.js should use the parameters defined in ProducerReferenceTime elements in combination with ServiceDescription elements.
  * @property {boolean} [applyContentSteering=true]
- * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
- * @property {boolean} [applyCMCDParameters=true]
  * Set to true if dash.js should apply content steering during playback.
+ * @property {boolean} [applyParametersFromMpd=true]
+ * Set to true if dash.js should use the cmcd parameters defined in MDP or js elements.
  * @property {number} [eventControllerRefreshDelay=100]
  * For multi-period streams, overwrite the manifest mediaPresentationDuration attribute with the sum of period durations if the manifest mediaPresentationDuration is greater than the sum of period durations
  * @property {boolean} [enableManifestDurationMismatchFix=true]
@@ -10244,14 +10310,28 @@ function Settings() {
       applyServiceDescription: true,
       applyProducerReferenceTime: true,
       applyContentSteering: true,
-      applyCMCDParameters: true,
       eventControllerRefreshDelay: 100,
       enableManifestDurationMismatchFix: true,
       parseInbandPrft: false,
       enableManifestTimescaleMismatchFix: false,
       capabilities: {
         filterUnsupportedEssentialProperties: true,
-        supportedEssentialProperties: [_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS)),
+        supportedEssentialProperties: [{
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].FONT_DOWNLOAD_DVB_SCHEME
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].COLOUR_PRIMARIES_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].MATRIX_COEFFICIENTS_SCHEME_ID_URI,
+          value: /5|6/
+        }, {
+          schemeIdUri: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].TRANSFER_CHARACTERISTICS_SCHEME_ID_URI,
+          value: '6'
+        }].concat(_toConsumableArray(_streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].THUMBNAILS_SCHEME_ID_URIS.map(function (ep) {
+          return {
+            'schemeIdUri': ep
+          };
+        }))),
         useMediaCapabilitiesApi: false
       },
       timeShiftBuffer: {
@@ -10457,6 +10537,7 @@ function Settings() {
         }
       },
       cmcd: {
+        applyParametersFromMpd: true,
         enabled: false,
         sid: null,
         cid: null,
@@ -10464,7 +10545,7 @@ function Settings() {
         rtpSafetyFactor: 5,
         mode: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_MODE_QUERY,
         enabledKeys: _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_3__["default"].CMCD_AVAILABLE_KEYS,
-        includeInRequests: ['mpd', 'segment', 'other']
+        includeInRequests: ['segment']
       },
       cmsd: {
         enabled: false,
@@ -10494,7 +10575,7 @@ function Settings() {
     for (var n in source) {
       if (source.hasOwnProperty(n)) {
         if (dest.hasOwnProperty(n)) {
-          if (_typeof(source[n]) === 'object' && !(source[n] instanceof Array) && source[n] !== null) {
+          if (_typeof(source[n]) === 'object' && !(source[n] instanceof RegExp) && !(source[n] instanceof Array) && source[n] !== null) {
             mixinSettings(source[n], dest[n], path.slice() + n + '.');
           } else {
             dest[n] = _Utils_js__WEBPACK_IMPORTED_MODULE_1__["default"].clone(source[n]);
@@ -10643,6 +10724,9 @@ var Utils = /*#__PURE__*/function () {
         return src; // anything
       }
 
+      if (src instanceof RegExp) {
+        return new RegExp(src);
+      }
       var r;
       if (src instanceof Array) {
         // array
@@ -10754,6 +10838,16 @@ var Utils = /*#__PURE__*/function () {
         return relativePath;
       } catch (e) {
         return targetUrl;
+      }
+    }
+  }, {
+    key: "getHostFromUrl",
+    value: function getHostFromUrl(urlString) {
+      try {
+        var url = new URL(urlString);
+        return url.host;
+      } catch (e) {
+        return null;
       }
     }
   }, {
@@ -11759,10 +11853,8 @@ __webpack_require__.r(__webpack_exports__);
   BYTE_RANGE: 'byteRange',
   CENC_DEFAULT_KID: 'cenc:default_KID',
   CLIENT_DATA_REPORTING: 'ClientDataReporting',
-  CLIENT_DATA_REPORTING_AS_ARRAY: 'ClientDataReporting_asArray',
   CLIENT_REQUIREMENT: 'clientRequirement',
   CMCD_PARAMETERS: 'CMCDParameters',
-  CMCD_PARAMETERS_AS_ARRAY: 'CMCDParameters_asArray',
   CODECS: 'codecs',
   CODEC_PRIVATE_DATA: 'codecPrivateData',
   CODING_DEPENDENCY: 'codingDependency',
@@ -12316,6 +12408,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_PatchLocation_js__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! ../vo/PatchLocation.js */ "./src/dash/vo/PatchLocation.js");
 /* harmony import */ var _vo_ContentProtection_js__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! ../vo/ContentProtection.js */ "./src/dash/vo/ContentProtection.js");
 /* harmony import */ var _vo_ClientDataReporting_js__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! ../vo/ClientDataReporting.js */ "./src/dash/vo/ClientDataReporting.js");
+/* harmony import */ var _vo_CMCDParameters_js__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! ../vo/CMCDParameters.js */ "./src/dash/vo/CMCDParameters.js");
 function _createForOfIteratorHelper(o, allowArrayLike) { var it = typeof Symbol !== "undefined" && o[Symbol.iterator] || o["@@iterator"]; if (!it) { if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") { if (it) o = it; var i = 0; var F = function F() {}; return { s: F, n: function n() { if (i >= o.length) return { done: true }; return { done: false, value: o[i++] }; }, e: function e(_e) { throw _e; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var normalCompletion = true, didErr = false, err; return { s: function s() { it = it.call(o); }, n: function n() { var step = it.next(); normalCompletion = step.done; return step; }, e: function e(_e2) { didErr = true; err = _e2; }, f: function f() { try { if (!normalCompletion && it["return"] != null) it["return"](); } finally { if (didErr) throw err; } } }; }
 function _toConsumableArray(arr) { return _arrayWithoutHoles(arr) || _iterableToArray(arr) || _unsupportedIterableToArray(arr) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
@@ -12353,6 +12446,7 @@ function _arrayLikeToArray(arr, len) { if (len == null || len > arr.length) len 
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -13069,8 +13163,8 @@ function DashManifestModel() {
       throw new Error('Period cannot be null or undefined');
     }
     var id = _vo_Period_js__WEBPACK_IMPORTED_MODULE_4__["default"].DEFAULT_ID + '_' + i;
-    if (realPeriod.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].ID) && realPeriod.id.length > 0 && realPeriod.id !== '__proto__') {
-      id = realPeriod.id;
+    if (realPeriod.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].ID) && realPeriod.id.toString().length > 0 && realPeriod.id !== '__proto__') {
+      id = realPeriod.id.toString();
     }
     return id;
   }
@@ -13365,10 +13459,11 @@ function DashManifestModel() {
     }
     return entry;
   }
-  function _createClientDataResportingInstance(element) {
+  function _createClientDataReportingInstance(element) {
     var entry = new _vo_ClientDataReporting_js__WEBPACK_IMPORTED_MODULE_22__["default"]();
-    if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS)) {
-      entry.CMCDParameters = element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS];
+    if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS) && element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS].schemeIdUri === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_0__["default"].CTA_5004_2023_SCHEME) {
+      entry.cmcdParameters = new _vo_CMCDParameters_js__WEBPACK_IMPORTED_MODULE_23__["default"]();
+      entry.cmcdParameters.init(element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CMCD_PARAMETERS]);
     }
     if (element.hasOwnProperty(_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS) && element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS] !== '') {
       entry.serviceLocations = element[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].SERVICE_LOCATIONS];
@@ -13463,7 +13558,7 @@ function DashManifestModel() {
                 element = Array.isArray(element) ? element.at(element.length - 1) : element;
                 contentSteering = _createContentSteeringInstance(element);
               } else if (prop === _constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_1__["default"].CLIENT_DATA_REPORTING) {
-                clientDataReporting = _createClientDataResportingInstance(sd[prop]);
+                clientDataReporting = _createClientDataReportingInstance(sd[prop]);
               }
             }
           }
@@ -15508,6 +15603,104 @@ BaseURL.DEFAULT_DVB_WEIGHT = DEFAULT_DVB_WEIGHT;
 
 /***/ }),
 
+/***/ "./src/dash/vo/CMCDParameters.js":
+/*!***************************************!*\
+  !*** ./src/dash/vo/CMCDParameters.js ***!
+  \***************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _DescriptorType_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./DescriptorType.js */ "./src/dash/vo/DescriptorType.js");
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
+function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
+function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
+function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
+function _get() { if (typeof Reflect !== "undefined" && Reflect.get) { _get = Reflect.get.bind(); } else { _get = function _get(target, property, receiver) { var base = _superPropBase(target, property); if (!base) return; var desc = Object.getOwnPropertyDescriptor(base, property); if (desc.get) { return desc.get.call(arguments.length < 3 ? target : receiver); } return desc.value; }; } return _get.apply(this, arguments); }
+function _superPropBase(object, property) { while (!Object.prototype.hasOwnProperty.call(object, property)) { object = _getPrototypeOf(object); if (object === null) break; } return object; }
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
+function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
+function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
+function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2024, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+
+/**
+ * @class
+ * @ignore
+ */
+var CMCDParameters = /*#__PURE__*/function (_DescriptorType) {
+  _inherits(CMCDParameters, _DescriptorType);
+  var _super = _createSuper(CMCDParameters);
+  function CMCDParameters() {
+    var _this;
+    _classCallCheck(this, CMCDParameters);
+    _this = _super.call(this);
+    _this.version = null;
+    _this.sessionID = null;
+    _this.contentID = null;
+    _this.mode = null;
+    _this.keys = null;
+    _this.includeInRequests = null;
+    return _this;
+  }
+  _createClass(CMCDParameters, [{
+    key: "init",
+    value: function init(data) {
+      _get(_getPrototypeOf(CMCDParameters.prototype), "init", this).call(this, data);
+      if (data) {
+        var _data$mode;
+        this.version = data.version;
+        this.sessionID = data.sessionID;
+        this.contentID = data.contentID;
+        this.mode = (_data$mode = data.mode) !== null && _data$mode !== void 0 ? _data$mode : 'query';
+        this.keys = data.keys ? data.keys.split(' ') : null;
+        this.includeInRequests = data.includeInRequests ? data.includeInRequests.split(' ') : ['segment'];
+        this.schemeIdUri = data.schemeIdUri;
+      }
+    }
+  }]);
+  return CMCDParameters;
+}(_DescriptorType_js__WEBPACK_IMPORTED_MODULE_0__["default"]);
+/* harmony default export */ __webpack_exports__["default"] = (CMCDParameters);
+
+/***/ }),
+
 /***/ "./src/dash/vo/ClientDataReporting.js":
 /*!********************************************!*\
   !*** ./src/dash/vo/ClientDataReporting.js ***!
@@ -15558,7 +15751,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
  */
 var ClientDataReporting = /*#__PURE__*/_createClass(function ClientDataReporting() {
   _classCallCheck(this, ClientDataReporting);
-  this.CMCDParameters = null;
+  this.cmcdParameters = null;
   this.serviceLocations = null;
   this.serviceLocationsArray = [];
   this.adaptationSets = null;
@@ -15813,6 +16006,21 @@ var DescriptorType = /*#__PURE__*/function () {
           this.dvbFontFamily = data[_constants_DashConstants_js__WEBPACK_IMPORTED_MODULE_0__["default"].DVB_FONTFAMILY];
         }
       }
+    }
+  }, {
+    key: "inArray",
+    value: function inArray(arr) {
+      var _this = this;
+      if (arr) {
+        return arr.some(function (entry) {
+          return _this.schemeIdUri === entry.schemeIdUri && (_this.value ? _this.value.match(entry.value) :
+          // check if provided value matches RegExp
+          ''.match(entry.value) // check if RegExp allows absent value   
+          );
+        });
+      }
+
+      return false;
     }
   }]);
   return DescriptorType;
@@ -16508,6 +16716,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _utils_OfflineIndexDBManifestParser_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./utils/OfflineIndexDBManifestParser.js */ "./src/offline/utils/OfflineIndexDBManifestParser.js");
 /* harmony import */ var _errors_OfflineErrors_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./errors/OfflineErrors.js */ "./src/offline/errors/OfflineErrors.js");
 /* harmony import */ var _dash_parser_DashParser_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../dash/parser/DashParser.js */ "./src/dash/parser/DashParser.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -16538,6 +16747,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -17102,7 +17312,7 @@ function OfflineDownload(config) {
   return instance;
 }
 OfflineDownload.__dashjs_factory_name = 'OfflineDownload';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(OfflineDownload)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_5__["default"].getClassFactory(OfflineDownload)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -17115,6 +17325,7 @@ OfflineDownload.__dashjs_factory_name = 'OfflineDownload';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _OfflineStreamProcessor_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./OfflineStreamProcessor.js */ "./src/offline/OfflineStreamProcessor.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -17145,6 +17356,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 /**
@@ -17434,7 +17646,7 @@ function OfflineStream(config) {
   return instance;
 }
 OfflineStream.__dashjs_factory_name = 'OfflineStream';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(OfflineStream)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(OfflineStream)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -18252,6 +18464,7 @@ dashjs.FactoryMaker.updateClassFactory(OfflineController.__dashjs_factory_name, 
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _storage_IndexDBStore_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../storage/IndexDBStore.js */ "./src/offline/storage/IndexDBStore.js");
 /* harmony import */ var _errors_OfflineErrors_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../errors/OfflineErrors.js */ "./src/offline/errors/OfflineErrors.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -18282,6 +18495,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 
@@ -18406,7 +18620,7 @@ function OfflineStoreController(config) {
   return instance;
 }
 OfflineStoreController.__dashjs_factory_name = 'OfflineStoreController';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(OfflineStoreController)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getClassFactory(OfflineStoreController)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -18680,6 +18894,7 @@ var factory = dashjs.FactoryMaker.getClassFactory(IndexDBOfflineLoader); /* jshi
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var localforage__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! localforage */ "./node_modules/localforage/dist/localforage.js");
 /* harmony import */ var html_entities__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! html-entities */ "./node_modules/html-entities/lib/index.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -18714,6 +18929,7 @@ __webpack_require__.r(__webpack_exports__);
 /**
  * @ignore
  */
+
 
 
 function IndexDBStore() {
@@ -19100,7 +19316,7 @@ function IndexDBStore() {
   return instance;
 }
 IndexDBStore.__dashjs_factory_name = 'IndexDBStore';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(IndexDBStore)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_2__["default"].getSingletonFactory(IndexDBStore)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -19113,6 +19329,7 @@ IndexDBStore.__dashjs_factory_name = 'IndexDBStore';
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var html_entities__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! html-entities */ "./node_modules/html-entities/lib/index.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -19147,6 +19364,7 @@ __webpack_require__.r(__webpack_exports__);
 /**
  * @ignore
  */
+
 
 var OFFLINE_BASE_URL = 'offline_indexeddb://';
 function OfflineIndexDBManifestParser(config) {
@@ -19558,7 +19776,7 @@ function OfflineIndexDBManifestParser(config) {
   return instance;
 }
 OfflineIndexDBManifestParser.__dashjs_factory_name = 'OfflineIndexDBManifestParser';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getClassFactory(OfflineIndexDBManifestParser)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getClassFactory(OfflineIndexDBManifestParser)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -19571,6 +19789,7 @@ OfflineIndexDBManifestParser.__dashjs_factory_name = 'OfflineIndexDBManifestPars
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _constants_OfflineConstants_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../constants/OfflineConstants.js */ "./src/offline/constants/OfflineConstants.js");
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
 /**
  * The copyright in this software is being made available under the BSD License,
  * included below. This software may be subject to other third party and contributor
@@ -19601,6 +19820,7 @@ __webpack_require__.r(__webpack_exports__);
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 
 function OfflineUrlUtils() {
@@ -19636,7 +19856,7 @@ function OfflineUrlUtils() {
   return instance;
 }
 OfflineUrlUtils.__dashjs_factory_name = 'OfflineUrlUtils';
-/* harmony default export */ __webpack_exports__["default"] = (dashjs.FactoryMaker.getSingletonFactory(OfflineUrlUtils)); /* jshint ignore:line */
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_1__["default"].getSingletonFactory(OfflineUrlUtils)); /* jshint ignore:line */
 
 /***/ }),
 
@@ -20589,17 +20809,17 @@ __webpack_require__.r(__webpack_exports__);
    */
   CMCD_MODE_HEADER: 'header',
   /**
-   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_KEYS specifies all the availables keys for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
   CMCD_AVAILABLE_KEYS: ['br', 'd', 'ot', 'tb', 'bl', 'dl', 'mtp', 'nor', 'nrr', 'su', 'bs', 'rtp', 'cid', 'pr', 'sf', 'sid', 'st', 'v'],
   /**
-   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CDCD metrics.
+   *  @constant {string} CMCD_AVAILABLE_REQUESTS specifies all the availables requests type for CMCD metrics.
    *  @memberof Constants#
    *  @static
    */
-  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering'],
+  CMCD_AVAILABLE_REQUESTS: ['segment', 'mpd', 'xlink', 'steering', 'other'],
   INITIALIZE: 'initialize',
   TEXT_SHOWING: 'showing',
   TEXT_HIDDEN: 'hidden',
@@ -20612,8 +20832,12 @@ __webpack_require__.r(__webpack_exports__);
   START_TIME: 'starttime',
   SERVICE_DESCRIPTION_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:scope:2019',
   SUPPLEMENTAL_PROPERTY_DVB_LL_SCHEME: 'urn:dvb:dash:lowlatency:critical:2019',
+  CTA_5004_2023_SCHEME: 'urn:mpeg:dash:cta-5004:2023',
   THUMBNAILS_SCHEME_ID_URIS: ['http://dashif.org/thumbnail_tile', 'http://dashif.org/guidelines/thumbnail_tile'],
   FONT_DOWNLOAD_DVB_SCHEME: 'urn:dvb:dash:fontdownload:2014',
+  COLOUR_PRIMARIES_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:ColourPrimaries',
+  MATRIX_COEFFICIENTS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:MatrixCoefficients',
+  TRANSFER_CHARACTERISTICS_SCHEME_ID_URI: 'urn:mpeg:mpegB:cicp:TransferCharacteristics',
   XML: 'XML',
   ARRAY_BUFFER: 'ArrayBuffer',
   DVB_REPORTING_URL: 'dvb:reportingUrl',
@@ -20671,8 +20895,178 @@ __webpack_require__.r(__webpack_exports__);
    *  @memberof Constants#
    *  @static
    */
-  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3'
+  ID3_SCHEME_ID_URI: 'https://aomedia.org/emsg/ID3',
+  COMMON_ACCESS_TOKEN_HEADER: 'common-access-token'
 });
+
+/***/ }),
+
+/***/ "./src/streaming/controllers/ClientDataReportingController.js":
+/*!********************************************************************!*\
+  !*** ./src/streaming/controllers/ClientDataReportingController.js ***!
+  \********************************************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2024, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+function ClientDataReportingController() {
+  var instance, serviceDescriptionController;
+  function setConfig(config) {
+    if (!config) return;
+    if (config.serviceDescriptionController) {
+      serviceDescriptionController = config.serviceDescriptionController;
+    }
+  }
+  function isServiceLocationIncluded(requestType, serviceLocation) {
+    var _serviceDescriptionCo, _serviceDescriptionCo2;
+    if (requestType === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__.HTTPRequest.CONTENT_STEERING_TYPE) {
+      return true;
+    }
+    var _ref = (_serviceDescriptionCo = (_serviceDescriptionCo2 = serviceDescriptionController) === null || _serviceDescriptionCo2 === void 0 || (_serviceDescriptionCo2 = _serviceDescriptionCo2.getServiceDescriptionSettings()) === null || _serviceDescriptionCo2 === void 0 ? void 0 : _serviceDescriptionCo2.clientDataReporting) !== null && _serviceDescriptionCo !== void 0 ? _serviceDescriptionCo : {},
+      serviceLocationsArray = _ref.serviceLocationsArray;
+    var isIncluded = serviceLocationsArray ? (serviceLocationsArray === null || serviceLocationsArray === void 0 ? void 0 : serviceLocationsArray.length) === 0 || serviceLocationsArray.includes(serviceLocation) : true;
+    return isIncluded;
+  }
+  function isAdaptationsIncluded(adaptationSet) {
+    var _serviceDescriptionCo3, _serviceDescriptionCo4;
+    var _ref2 = (_serviceDescriptionCo3 = (_serviceDescriptionCo4 = serviceDescriptionController) === null || _serviceDescriptionCo4 === void 0 || (_serviceDescriptionCo4 = _serviceDescriptionCo4.getServiceDescriptionSettings()) === null || _serviceDescriptionCo4 === void 0 ? void 0 : _serviceDescriptionCo4.clientDataReporting) !== null && _serviceDescriptionCo3 !== void 0 ? _serviceDescriptionCo3 : {},
+      adaptationSetsArray = _ref2.adaptationSetsArray;
+    var isIncluded = adaptationSetsArray ? (adaptationSetsArray === null || adaptationSetsArray === void 0 ? void 0 : adaptationSetsArray.length) === 0 || adaptationSetsArray.includes(adaptationSet) : true;
+    return isIncluded;
+  }
+  instance = {
+    setConfig: setConfig,
+    isAdaptationsIncluded: isAdaptationsIncluded,
+    isServiceLocationIncluded: isServiceLocationIncluded
+  };
+  return instance;
+}
+ClientDataReportingController.__dashjs_factory_name = 'ClientDataReportingController';
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(ClientDataReportingController));
+
+/***/ }),
+
+/***/ "./src/streaming/controllers/CommonAccessTokenController.js":
+/*!******************************************************************!*\
+  !*** ./src/streaming/controllers/CommonAccessTokenController.js ***!
+  \******************************************************************/
+/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
+/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
+/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
+/**
+ * The copyright in this software is being made available under the BSD License,
+ * included below. This software may be subject to other third party and contributor
+ * rights, including patent rights, and no such rights are granted under this license.
+ *
+ * Copyright (c) 2013, Dash Industry Forum.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice, this
+ *  list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *  this list of conditions and the following disclaimer in the documentation and/or
+ *  other materials provided with the distribution.
+ *  * Neither the name of Dash Industry Forum nor the names of its
+ *  contributors may be used to endorse or promote products derived from this software
+ *  without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
+ *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
+
+
+function CommonAccessTokenController() {
+  var instance, hostTokenMap;
+  function processResponseHeaders(httpResponse) {
+    if (!httpResponse || !httpResponse.headers || !httpResponse.request || !httpResponse.request.url) {
+      return;
+    }
+    var commonAccessTokenHeader = httpResponse.headers[_constants_Constants_js__WEBPACK_IMPORTED_MODULE_1__["default"].COMMON_ACCESS_TOKEN_HEADER];
+    if (commonAccessTokenHeader) {
+      var host = _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__["default"].getHostFromUrl(httpResponse.request.url);
+      if (host) {
+        hostTokenMap[host] = commonAccessTokenHeader;
+      }
+    }
+  }
+  function getCommonAccessTokenForUrl(url) {
+    if (!url) {
+      return null;
+    }
+    var host = _core_Utils_js__WEBPACK_IMPORTED_MODULE_2__["default"].getHostFromUrl(url);
+    if (host) {
+      return hostTokenMap[host] ? hostTokenMap[host] : null;
+    }
+  }
+  function setup() {
+    _resetInitialSettings();
+  }
+  function reset() {
+    _resetInitialSettings();
+  }
+  function _resetInitialSettings() {
+    hostTokenMap = {};
+  }
+  instance = {
+    reset: reset,
+    processResponseHeaders: processResponseHeaders,
+    getCommonAccessTokenForUrl: getCommonAccessTokenForUrl
+  };
+  setup();
+  return instance;
+}
+CommonAccessTokenController.__dashjs_factory_name = 'CommonAccessTokenController';
+/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(CommonAccessTokenController));
 
 /***/ }),
 
@@ -21025,85 +21419,6 @@ AastLowLatencyThroughputModel.__dashjs_factory_name = 'AastLowLatencyThroughputM
 
 /***/ }),
 
-/***/ "./src/streaming/models/ClientDataReportingModel.js":
-/*!**********************************************************!*\
-  !*** ./src/streaming/models/ClientDataReportingModel.js ***!
-  \**********************************************************/
-/***/ (function(__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/FactoryMaker.js */ "./src/core/FactoryMaker.js");
-/* harmony import */ var _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../vo/metrics/HTTPRequest.js */ "./src/streaming/vo/metrics/HTTPRequest.js");
-/**
- * The copyright in this software is being made available under the BSD License,
- * included below. This software may be subject to other third party and contributor
- * rights, including patent rights, and no such rights are granted under this license.
- *
- * Copyright (c) 2024, Dash Industry Forum.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice, this
- *  list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *  this list of conditions and the following disclaimer in the documentation and/or
- *  other materials provided with the distribution.
- *  * Neither the name of Dash Industry Forum nor the names of its
- *  contributors may be used to endorse or promote products derived from this software
- *  without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS AS IS AND ANY
- *  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- *  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- *  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- *  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- *  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- *  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- */
-
-
-function ClientDataReportingModel() {
-  var instance, serviceDescriptionController;
-  function setConfig(config) {
-    if (!config) return;
-    if (config.serviceDescriptionController) {
-      serviceDescriptionController = config.serviceDescriptionController;
-    }
-  }
-  function serviceLocationIncluded(requestType, serviceLocation) {
-    var _serviceDescriptionCo, _serviceDescriptionCo2;
-    if (requestType == _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_1__.HTTPRequest.CONTENT_STEERING_TYPE) {
-      return true;
-    }
-    var _ref = (_serviceDescriptionCo = (_serviceDescriptionCo2 = serviceDescriptionController) === null || _serviceDescriptionCo2 === void 0 || (_serviceDescriptionCo2 = _serviceDescriptionCo2.getServiceDescriptionSettings()) === null || _serviceDescriptionCo2 === void 0 ? void 0 : _serviceDescriptionCo2.clientDataReporting) !== null && _serviceDescriptionCo !== void 0 ? _serviceDescriptionCo : {},
-      serviceLocationsArray = _ref.serviceLocationsArray;
-    var isServiceLocationIncluded = serviceLocationsArray ? (serviceLocationsArray === null || serviceLocationsArray === void 0 ? void 0 : serviceLocationsArray.length) === 0 || serviceLocationsArray.includes(serviceLocation) : true;
-    return isServiceLocationIncluded;
-  }
-  function adaptationSetIncluded(adaptationSet) {
-    var _serviceDescriptionCo3, _serviceDescriptionCo4;
-    var _ref2 = (_serviceDescriptionCo3 = (_serviceDescriptionCo4 = serviceDescriptionController) === null || _serviceDescriptionCo4 === void 0 || (_serviceDescriptionCo4 = _serviceDescriptionCo4.getServiceDescriptionSettings()) === null || _serviceDescriptionCo4 === void 0 ? void 0 : _serviceDescriptionCo4.clientDataReporting) !== null && _serviceDescriptionCo3 !== void 0 ? _serviceDescriptionCo3 : {},
-      adaptationSetsArray = _ref2.adaptationSetsArray;
-    var isAdaptationsIncluded = adaptationSetsArray ? (adaptationSetsArray === null || adaptationSetsArray === void 0 ? void 0 : adaptationSetsArray.length) === 0 || adaptationSetsArray.includes(adaptationSet) : true;
-    return isAdaptationsIncluded;
-  }
-  instance = {
-    setConfig: setConfig,
-    adaptationSetIncluded: adaptationSetIncluded,
-    serviceLocationIncluded: serviceLocationIncluded
-  };
-  return instance;
-}
-ClientDataReportingModel.__dashjs_factory_name = 'ClientDataReportingModel';
-/* harmony default export */ __webpack_exports__["default"] = (_core_FactoryMaker_js__WEBPACK_IMPORTED_MODULE_0__["default"].getSingletonFactory(ClientDataReportingModel));
-
-/***/ }),
-
 /***/ "./src/streaming/models/CmcdModel.js":
 /*!*******************************************!*\
   !*** ./src/streaming/models/CmcdModel.js ***!
@@ -21186,17 +21501,7 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 
 
 var CMCD_VERSION = 1;
-var CMCD_ALL_REQUESTS = '*';
-var OBJECT_TYPES = {
-  MANIFEST: 'm',
-  AUDIO: 'a',
-  VIDEO: 'v',
-  INIT: 'i',
-  CAPTION: 'c',
-  ISOBMFF_TEXT_TRACK: 'tt',
-  ENCRYPTION_KEY: 'k',
-  OTHER: 'o'
-};
+var DEFAULT_INCLUDE_IN_REQUESTS = 'segment';
 var RTP_SAFETY_FACTOR = 5;
 function CmcdModel() {
   var dashManifestModel, instance, logger, internalData, abrController, dashMetrics, playbackController, serviceDescriptionController, throughputController, streamProcessors, _lastMediaTypeRequest, _isStartup, _bufferLevelStarved, _initialMediaRequestsDone;
@@ -21285,8 +21590,8 @@ function CmcdModel() {
   }
   function _applyWhitelist(cmcdData) {
     try {
-      var cmcdParameters = getCmcdParametersFromManifest();
-      var enabledCMCDKeys = cmcdParameters.version ? cmcdParameters.keys.split(' ') : settings.get().streaming.cmcd.enabledKeys;
+      var cmcdParametersFromManifest = getCmcdParametersFromManifest();
+      var enabledCMCDKeys = cmcdParametersFromManifest.version ? cmcdParametersFromManifest.keys : settings.get().streaming.cmcd.enabledKeys;
       return Object.keys(cmcdData).filter(function (key) {
         return enabledCMCDKeys.includes(key);
       }).reduce(function (obj, key) {
@@ -21317,38 +21622,36 @@ function CmcdModel() {
     }
   }
   function isCmcdEnabled() {
-    var cmcdParameters = getCmcdParametersFromManifest();
-    return _canBeEnabled(cmcdParameters) && _checkIncludeInRequests(cmcdParameters) && _checkAvailableKeys(cmcdParameters);
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
+    return _canBeEnabled(cmcdParametersFromManifest) && _checkIncludeInRequests(cmcdParametersFromManifest) && _checkAvailableKeys(cmcdParametersFromManifest);
   }
-  function _canBeEnabled(cmcdParameters) {
-    if (Object.keys(cmcdParameters).length) {
-      if (!cmcdParameters.version) {
+  function _canBeEnabled(cmcdParametersFromManifest) {
+    if (Object.keys(cmcdParametersFromManifest).length) {
+      if (!cmcdParametersFromManifest.version) {
         logger.error("version parameter must be defined.");
         return false;
       }
-      if (!cmcdParameters.keys) {
+      if (!cmcdParametersFromManifest.keys) {
         logger.error("keys parameter must be defined.");
         return false;
       }
     }
-    return cmcdParameters.version ? true : settings.get().streaming.cmcd && settings.get().streaming.cmcd.enabled;
+    var isEnabledFromManifest = cmcdParametersFromManifest.version;
+    var isEnabledFromSettings = settings.get().streaming.cmcd && settings.get().streaming.cmcd.enabled;
+    return isEnabledFromManifest || isEnabledFromSettings;
   }
-  function _checkIncludeInRequests(cmcdParameters) {
+  function _checkIncludeInRequests(cmcdParametersFromManifest) {
     var enabledRequests = settings.get().streaming.cmcd.includeInRequests;
-    if (cmcdParameters.version) {
-      var _cmcdParameters$inclu, _cmcdParameters$inclu2;
-      enabledRequests = (_cmcdParameters$inclu = (_cmcdParameters$inclu2 = cmcdParameters.includeInRequests) === null || _cmcdParameters$inclu2 === void 0 ? void 0 : _cmcdParameters$inclu2.split(' ')) !== null && _cmcdParameters$inclu !== void 0 ? _cmcdParameters$inclu : [CMCD_ALL_REQUESTS];
-      if (!enabledRequests || enabledRequests.some(function (k) {
-        return k === CMCD_ALL_REQUESTS;
-      })) {
-        return true;
-      }
+    console.log(enabledRequests);
+    if (cmcdParametersFromManifest.version) {
+      var _cmcdParametersFromMa;
+      enabledRequests = (_cmcdParametersFromMa = cmcdParametersFromManifest.includeInRequests) !== null && _cmcdParametersFromMa !== void 0 ? _cmcdParametersFromMa : [DEFAULT_INCLUDE_IN_REQUESTS];
     }
     var defaultAvailableRequests = _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].CMCD_AVAILABLE_REQUESTS;
     var invalidRequests = enabledRequests.filter(function (k) {
       return !defaultAvailableRequests.includes(k);
     });
-    if (invalidRequests.length == enabledRequests.length) {
+    if (invalidRequests.length === enabledRequests.length) {
       logger.error("None of the request types are supported.");
       return false;
     }
@@ -21357,13 +21660,13 @@ function CmcdModel() {
     });
     return true;
   }
-  function _checkAvailableKeys(cmcdParameters) {
+  function _checkAvailableKeys(cmcdParametersFromManifest) {
     var defaultAvailableKeys = _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].CMCD_AVAILABLE_KEYS;
-    var enabledCMCDKeys = cmcdParameters.version ? cmcdParameters.keys.split(' ') : settings.get().streaming.cmcd.enabledKeys;
+    var enabledCMCDKeys = cmcdParametersFromManifest.version ? cmcdParametersFromManifest.keys : settings.get().streaming.cmcd.enabledKeys;
     var invalidKeys = enabledCMCDKeys.filter(function (k) {
       return !defaultAvailableKeys.includes(k);
     });
-    if (invalidKeys.length == enabledCMCDKeys.length && enabledCMCDKeys.length > 0) {
+    if (invalidKeys.length === enabledCMCDKeys.length && enabledCMCDKeys.length > 0) {
       logger.error("None of the keys are implemented.");
       return false;
     }
@@ -21373,27 +21676,21 @@ function CmcdModel() {
     return true;
   }
   function getCmcdParametersFromManifest() {
-    var cmcdParameters = {};
+    var cmcdParametersFromManifest = {};
     if (serviceDescriptionController) {
       var serviceDescription = serviceDescriptionController.getServiceDescriptionSettings();
-      if (settings.get().streaming.applyCMCDParameters && serviceDescription.clientDataReporting && serviceDescription.clientDataReporting.CMCDParameters) {
-        cmcdParameters = serviceDescription.clientDataReporting.CMCDParameters;
+      if (settings.get().streaming.cmcd.applyParametersFromMpd && serviceDescription.clientDataReporting && serviceDescription.clientDataReporting.cmcdParameters) {
+        cmcdParametersFromManifest = serviceDescription.clientDataReporting.cmcdParameters;
       }
     }
-    return cmcdParameters;
+    return cmcdParametersFromManifest;
   }
   function _isIncludedInRequestFilter(type) {
     var _filtersTypes;
-    var cmcdParameters = getCmcdParametersFromManifest();
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
     var includeInRequestsArray = settings.get().streaming.cmcd.includeInRequests;
-    if (cmcdParameters.version) {
-      var includeInRequests = cmcdParameters.includeInRequests;
-      includeInRequestsArray = includeInRequests ? includeInRequests.split(' ') : [CMCD_ALL_REQUESTS];
-    }
-    if (includeInRequestsArray.find(function (t) {
-      return t === CMCD_ALL_REQUESTS;
-    })) {
-      return true;
+    if (cmcdParametersFromManifest.version) {
+      includeInRequestsArray = cmcdParametersFromManifest.includeInRequests ? cmcdParametersFromManifest.includeInRequests : [DEFAULT_INCLUDE_IN_REQUESTS];
     }
     var filtersTypes = (_filtersTypes = {}, _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.INIT_SEGMENT_TYPE, 'segment'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.MEDIA_SEGMENT_TYPE, 'segment'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.XLINK_EXPANSION_TYPE, 'xlink'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.MPD_TYPE, 'mpd'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.CONTENT_STEERING_TYPE, 'steering'), _defineProperty(_filtersTypes, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_6__.HTTPRequest.OTHER_TYPE, 'other'), _filtersTypes);
     return includeInRequestsArray.some(function (t) {
@@ -21427,13 +21724,13 @@ function CmcdModel() {
   }
   function _updateLastMediaTypeRequest(type, mediatype) {
     // Video > Audio > None
-    if (mediatype == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].VIDEO || mediatype == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) {
+    if (mediatype === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].VIDEO || mediatype === _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) {
       if (!_lastMediaTypeRequest || _lastMediaTypeRequest == _streaming_constants_Constants_js__WEBPACK_IMPORTED_MODULE_5__["default"].AUDIO) _lastMediaTypeRequest = mediatype;
     }
   }
   function _getCmcdDataForSteering(request) {
     var data = !_lastMediaTypeRequest ? _getGenericCmcdData(request) : _getCmcdDataForMediaSegment(request, _lastMediaTypeRequest);
-    data.ot = OBJECT_TYPES.OTHER;
+    data.ot = _svta_common_media_library_cmcd_CmcdObjectType__WEBPACK_IMPORTED_MODULE_11__.CmcdObjectType.OTHER;
     return data;
   }
   function _getCmcdDataForLicense(request) {
@@ -21540,13 +21837,13 @@ function CmcdModel() {
     return data;
   }
   function _getGenericCmcdData() {
-    var cmcdParameters = getCmcdParametersFromManifest();
+    var cmcdParametersFromManifest = getCmcdParametersFromManifest();
     var data = {};
     var cid = settings.get().streaming.cmcd.cid ? settings.get().streaming.cmcd.cid : internalData.cid;
-    data.v = cmcdParameters.version ? cmcdParameters.version : CMCD_VERSION;
+    cid = cmcdParametersFromManifest.contentID ? cmcdParametersFromManifest.contentID : cid;
+    data.v = CMCD_VERSION;
     data.sid = settings.get().streaming.cmcd.sid ? settings.get().streaming.cmcd.sid : internalData.sid;
-    cid = cmcdParameters.contentID ? cmcdParameters.contentID : cid;
-    data.sid = cmcdParameters.sessionID ? cmcdParameters.sessionID : data.sid;
+    data.sid = cmcdParametersFromManifest.sessionID ? cmcdParametersFromManifest.sessionID : data.sid;
     data.sid = "".concat(data.sid);
     if (cid) {
       data.cid = "".concat(cid);
@@ -22112,7 +22409,7 @@ function CustomParametersModel() {
 
   /**
    * Registers a custom capabilities filter. This enables application to filter representations to use.
-   * The provided callback function shall return a boolean based on whether or not to use the representation.
+   * The provided callback function shall return a boolean or promise resolving to a boolean based on whether or not to use the representation.
    * The filters are applied in the order they are registered.
    * @param {function} filter - the custom capabilities filter callback
    */
@@ -22824,7 +23121,7 @@ function FetchLoader() {
         httpResponse.statusText = response.statusText;
         httpResponse.url = response.url;
         if (!response.ok) {
-          httpRequest.customData.onerror();
+          httpRequest.customData.onloadend();
         }
         var responseHeaders = {};
         var _iterator = _createForOfIteratorHelper(response.headers.keys()),
@@ -22904,7 +23201,6 @@ function FetchLoader() {
             }
             httpResponse.data = receivedData.buffer;
           }
-          httpRequest.customData.onload();
           httpRequest.customData.onloadend();
         }
 
@@ -22981,9 +23277,9 @@ function FetchLoader() {
           }
         }
         _read(httpRequest, httpResponse, _processResult);
-      })["catch"](function (e) {
-        if (httpRequest.customData.onerror) {
-          httpRequest.customData.onerror(e);
+      })["catch"](function () {
+        if (httpRequest.customData.onloadend) {
+          httpRequest.customData.onloadend();
         }
       });
     });
@@ -23046,10 +23342,9 @@ function FetchLoader() {
    * @private
    */
   function _read(httpRequest, httpResponse, processResult) {
-    httpRequest.customData.reader.read().then(processResult)["catch"](function (e) {
-      if (httpRequest.customData.onerror && httpResponse.status === 200) {
-        // Error, but response code is 200, trigger error
-        httpRequest.customData.onerror(e);
+    httpRequest.customData.reader.read().then(processResult)["catch"](function () {
+      if (httpRequest.customData.onloadend) {
+        httpRequest.customData.onloadend();
       }
     });
   }
@@ -23211,14 +23506,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _vo_DashJSError_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../vo/DashJSError.js */ "./src/streaming/vo/DashJSError.js");
 /* harmony import */ var _models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../models/CmcdModel.js */ "./src/streaming/models/CmcdModel.js");
 /* harmony import */ var _models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../models/CmsdModel.js */ "./src/streaming/models/CmsdModel.js");
-/* harmony import */ var _models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../models/ClientDataReportingModel.js */ "./src/streaming/models/ClientDataReportingModel.js");
-/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
-/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../core/Debug.js */ "./src/core/Debug.js");
-/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../core/EventBus.js */ "./src/core/EventBus.js");
-/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../core/events/Events.js */ "./src/core/events/Events.js");
-/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../../core/Settings.js */ "./src/core/Settings.js");
-/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
-/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../core/Utils.js */ "./src/core/Utils.js");
+/* harmony import */ var _core_Debug_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../../core/Debug.js */ "./src/core/Debug.js");
+/* harmony import */ var _core_EventBus_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../../core/EventBus.js */ "./src/core/EventBus.js");
+/* harmony import */ var _core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../core/events/Events.js */ "./src/core/events/Events.js");
+/* harmony import */ var _core_Settings_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../../core/Settings.js */ "./src/core/Settings.js");
+/* harmony import */ var _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../constants/Constants.js */ "./src/streaming/constants/Constants.js");
+/* harmony import */ var _models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../models/CustomParametersModel.js */ "./src/streaming/models/CustomParametersModel.js");
+/* harmony import */ var _controllers_CommonAccessTokenController_js__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../controllers/CommonAccessTokenController.js */ "./src/streaming/controllers/CommonAccessTokenController.js");
+/* harmony import */ var _controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../controllers/ClientDataReportingController.js */ "./src/streaming/controllers/ClientDataReportingController.js");
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
@@ -23269,6 +23565,7 @@ function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input ==
 
 
 
+
 /**
  * @module HTTPLoader
  * @ignore
@@ -23284,20 +23581,29 @@ function HTTPLoader(cfg) {
   var boxParser = cfg.boxParser;
   var errors = cfg.errors;
   var requestTimeout = cfg.requestTimeout || 0;
-  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_10__["default"])(context).getInstance();
-  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_12__["default"])(context).getInstance();
-  var instance, httpRequests, delayedRequests, retryRequests, downloadErrorToRequestTypeMap, cmcdModel, cmsdModel, clientDataReportingModel, xhrLoader, fetchLoader, customParametersModel, logger;
+  var eventBus = (0,_core_EventBus_js__WEBPACK_IMPORTED_MODULE_9__["default"])(context).getInstance();
+  var settings = (0,_core_Settings_js__WEBPACK_IMPORTED_MODULE_11__["default"])(context).getInstance();
+  var instance, httpRequests, delayedRequests, retryRequests, downloadErrorToRequestTypeMap, cmcdModel, cmsdModel, xhrLoader, fetchLoader, customParametersModel, commonAccessTokenController, clientDataReportingController, logger;
   function setup() {
     var _downloadErrorToReque;
-    logger = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_9__["default"])(context).getInstance().getLogger(instance);
+    logger = (0,_core_Debug_js__WEBPACK_IMPORTED_MODULE_8__["default"])(context).getInstance().getLogger(instance);
     httpRequests = [];
     delayedRequests = [];
     retryRequests = [];
     cmcdModel = (0,_models_CmcdModel_js__WEBPACK_IMPORTED_MODULE_5__["default"])(context).getInstance();
-    clientDataReportingModel = (0,_models_ClientDataReportingModel_js__WEBPACK_IMPORTED_MODULE_7__["default"])(context).getInstance();
+    clientDataReportingController = (0,_controllers_ClientDataReportingController_js__WEBPACK_IMPORTED_MODULE_15__["default"])(context).getInstance();
     cmsdModel = (0,_models_CmsdModel_js__WEBPACK_IMPORTED_MODULE_6__["default"])(context).getInstance();
-    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_14__["default"])(context).getInstance();
+    customParametersModel = (0,_models_CustomParametersModel_js__WEBPACK_IMPORTED_MODULE_13__["default"])(context).getInstance();
+    commonAccessTokenController = (0,_controllers_CommonAccessTokenController_js__WEBPACK_IMPORTED_MODULE_14__["default"])(context).getInstance();
     downloadErrorToRequestTypeMap = (_downloadErrorToReque = {}, _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE, errors.DOWNLOAD_ERROR_ID_MANIFEST_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.XLINK_EXPANSION_TYPE, errors.DOWNLOAD_ERROR_ID_XLINK_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.INIT_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_INITIALIZATION_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.INDEX_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.BITSTREAM_SWITCHING_SEGMENT_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _defineProperty(_downloadErrorToReque, _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.OTHER_TYPE, errors.DOWNLOAD_ERROR_ID_CONTENT_CODE), _downloadErrorToReque);
+  }
+  function setConfig(config) {
+    if (!config) {
+      return;
+    }
+    if (config.commonAccessTokenController) {
+      commonAccessTokenController = config.commonAccessTokenController;
+    }
   }
 
   /**
@@ -23326,17 +23632,10 @@ function HTTPLoader(cfg) {
    */
   function _internalLoad(config, remainingAttempts) {
     /**
-     * Fired when a request has completed, whether successfully (after load) or unsuccessfully (after abort or error).
+     * Fired when a request has completed, whether successfully (after load) or unsuccessfully (after abort, timeout or error).
      */
     var _onloadend = function _onloadend() {
-      // Remove the request from our list of requests
-      if (httpRequests.indexOf(httpRequest) !== -1) {
-        httpRequests.splice(httpRequests.indexOf(httpRequest), 1);
-      }
-      if (progressTimeout) {
-        clearTimeout(progressTimeout);
-        progressTimeout = null;
-      }
+      _onRequestEnd();
     };
 
     /**
@@ -23393,59 +23692,12 @@ function HTTPLoader(cfg) {
         config.progress(event);
       }
     };
-    var _oncomplete = function _oncomplete() {
-      // Update request timing info
-      requestObject.startDate = requestStartTime;
-      requestObject.endDate = new Date();
-      requestObject.firstByteDate = requestObject.firstByteDate || requestStartTime;
-      httpResponse.resourceTiming.responseEnd = requestObject.endDate.getTime();
-
-      // If enabled the ResourceTimingApi we add the corresponding information to the request object.
-      // These values are more accurate and can be used by the ThroughputController later
-      _addResourceTimingValues(httpRequest, httpResponse);
-    };
-
-    /**
-     * Fired when an XMLHttpRequest transaction completes.
-     * This includes status codes such as 404. We handle errors in the _onError function.
-     */
-    var _onload = function _onload() {
-      _oncomplete();
-      _applyResponseInterceptors(httpResponse).then(function (_httpResponse) {
-        httpResponse = _httpResponse;
-        _addHttpRequestMetric(httpRequest, httpResponse, traces);
-        if (requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE) {
-          dashMetrics.addManifestUpdate(requestObject);
-          eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__["default"].MANIFEST_LOADING_FINISHED, {
-            requestObject: requestObject
-          });
-        }
-        if (httpResponse.status >= 200 && httpResponse.status <= 299) {
-          if (config.success) {
-            config.success(httpResponse.data, httpResponse.statusText, httpResponse.url);
-          }
-          if (config.complete) {
-            config.complete(requestObject, httpResponse.statusText);
-          }
-        } else {
-          _onerror();
-        }
-      });
-    };
 
     /**
      * Fired when a request has been aborted, for example because the program called XMLHttpRequest.abort().
      */
     var _onabort = function _onabort() {
-      _oncomplete();
-      _addHttpRequestMetric(httpRequest, httpResponse, traces);
-      if (progressTimeout) {
-        clearTimeout(progressTimeout);
-        progressTimeout = null;
-      }
-      if (config.abort) {
-        config.abort(requestObject);
-      }
+      _onRequestEnd(true);
     };
 
     /**
@@ -23453,7 +23705,6 @@ function HTTPLoader(cfg) {
      * @param event
      */
     var _ontimeout = function _ontimeout(event) {
-      _oncomplete();
       var timeoutMessage;
       // We know how much we already downloaded by looking at the timeout event
       if (event.lengthComputable) {
@@ -23463,33 +23714,76 @@ function HTTPLoader(cfg) {
         timeoutMessage = 'Request timeout: non-computable download size';
       }
       logger.warn(timeoutMessage);
-      _addHttpRequestMetric(httpRequest, httpResponse, traces);
-      _retriggerRequest();
     };
+    var _onRequestEnd = function _onRequestEnd() {
+      var aborted = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+      // Remove the request from our list of requests
+      if (httpRequests.indexOf(httpRequest) !== -1) {
+        httpRequests.splice(httpRequests.indexOf(httpRequest), 1);
+      }
+      if (progressTimeout) {
+        clearTimeout(progressTimeout);
+        progressTimeout = null;
+      }
+      commonAccessTokenController.processResponseHeaders(httpResponse);
+      _updateRequestTimingInfo();
+      _updateResourceTimingInfo();
+      _applyResponseInterceptors(httpResponse).then(function (_httpResponse) {
+        httpResponse = _httpResponse;
+        _addHttpRequestMetric(httpRequest, httpResponse, traces);
 
-    /**
-     * Fired when the request encountered an error.
-     */
-    var _onerror = function _onerror() {
-      // If we get a 404 to a media segment we should check the client clock again and perform a UTC sync in the background.
-      try {
-        if (httpResponse.status === 404 && settings.get().streaming.utcSynchronization.enableBackgroundSyncAfterSegmentDownloadError && requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE) {
-          // Only trigger a sync if the loading failed for the first time
-          var initialNumberOfAttempts = mediaPlayerModel.getRetryAttemptsForType(_vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE);
-          if (initialNumberOfAttempts === remainingAttempts) {
-            eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_11__["default"].ATTEMPT_BACKGROUND_SYNC);
+        // Ignore aborted requests
+        if (aborted) {
+          if (config.abort) {
+            config.abort(requestObject);
           }
+          return;
         }
-      } catch (e) {}
-      _retriggerRequest();
+        if (requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MPD_TYPE) {
+          dashMetrics.addManifestUpdate(requestObject);
+          eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__["default"].MANIFEST_LOADING_FINISHED, {
+            requestObject: requestObject
+          });
+        }
+        if (httpResponse.status >= 200 && httpResponse.status <= 299 && httpResponse.data) {
+          if (config.success) {
+            config.success(httpResponse.data, httpResponse.statusText, httpResponse.url);
+          }
+          if (config.complete) {
+            config.complete(requestObject, httpResponse.statusText);
+          }
+        } else {
+          // If we get a 404 to a media segment we should check the client clock again and perform a UTC sync in the background.
+          try {
+            if (httpResponse.status === 404 && settings.get().streaming.utcSynchronization.enableBackgroundSyncAfterSegmentDownloadError && requestObject.type === _vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE) {
+              // Only trigger a sync if the loading failed for the first time
+              var initialNumberOfAttempts = mediaPlayerModel.getRetryAttemptsForType(_vo_metrics_HTTPRequest_js__WEBPACK_IMPORTED_MODULE_2__.HTTPRequest.MEDIA_SEGMENT_TYPE);
+              if (initialNumberOfAttempts === remainingAttempts) {
+                eventBus.trigger(_core_events_Events_js__WEBPACK_IMPORTED_MODULE_10__["default"].ATTEMPT_BACKGROUND_SYNC);
+              }
+            }
+          } catch (e) {}
+          _retriggerRequest();
+        }
+      });
+    };
+    var _updateRequestTimingInfo = function _updateRequestTimingInfo() {
+      requestObject.startDate = requestStartTime;
+      requestObject.endDate = new Date();
+      requestObject.firstByteDate = requestObject.firstByteDate || requestStartTime;
+    };
+    var _updateResourceTimingInfo = function _updateResourceTimingInfo() {
+      httpResponse.resourceTiming.responseEnd = Date.now();
+
+      // If enabled the ResourceTimingApi we add the corresponding information to the request object.
+      // These values are more accurate and can be used by the ThroughputController later
+      _addResourceTimingValues(httpRequest, httpResponse);
     };
     var _loadRequest = function _loadRequest(loader, httpRequest, httpResponse) {
       return new Promise(function (resolve) {
         _applyRequestInterceptors(httpRequest).then(function (_httpRequest) {
           httpRequest = _httpRequest;
-          httpRequest.customData.onload = _onload;
           httpRequest.customData.onloadend = _onloadend;
-          httpRequest.customData.onerror = _onloadend;
           httpRequest.customData.onprogress = _onprogress;
           httpRequest.customData.onabort = _onabort;
           httpRequest.customData.ontimeout = _ontimeout;
@@ -23583,7 +23877,8 @@ function HTTPLoader(cfg) {
       resourceTiming: {
         startTime: Date.now(),
         encodedBodySize: 0
-      }
+      },
+      status: 0
     };
 
     // Adds the ability to delay single fragment loading time to control buffer.
@@ -23611,7 +23906,7 @@ function HTTPLoader(cfg) {
           httpRequests.push(delayedRequest.httpRequest);
           _loadRequest(loader, delayedRequest.httpRequest, delayedRequest.httpResponse);
         } catch (e) {
-          delayedRequest.httpRequest.onerror();
+          delayedRequest.httpRequest.onloadend();
         }
       }, requestObject.delayLoadingTime - now);
       return Promise.resolve();
@@ -23716,13 +24011,13 @@ function HTTPLoader(cfg) {
         });
       }
       loader = fetchLoader;
-      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].FILE_LOADER_TYPES.FETCH;
+      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].FILE_LOADER_TYPES.FETCH;
     } else {
       if (!xhrLoader) {
         xhrLoader = (0,_XHRLoader_js__WEBPACK_IMPORTED_MODULE_0__["default"])(context).create();
       }
       loader = xhrLoader;
-      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].FILE_LOADER_TYPES.XHR;
+      fileLoaderType = _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].FILE_LOADER_TYPES.XHR;
     }
     return {
       loader: loader,
@@ -23736,20 +24031,7 @@ function HTTPLoader(cfg) {
    * @private
    */
   function _updateRequestUrlAndHeaders(request) {
-    var _request$mediaInfo;
-    var currentServiceLocation = request === null || request === void 0 ? void 0 : request.serviceLocation;
-    var currentAdaptationSetId = request === null || request === void 0 || (_request$mediaInfo = request.mediaInfo) === null || _request$mediaInfo === void 0 || (_request$mediaInfo = _request$mediaInfo.id) === null || _request$mediaInfo === void 0 ? void 0 : _request$mediaInfo.toString();
-    var isIncludedFilters = clientDataReportingModel.serviceLocationIncluded(request.type, currentServiceLocation) && clientDataReportingModel.adaptationSetIncluded(currentAdaptationSetId);
-    if (isIncludedFilters && cmcdModel.isCmcdEnabled()) {
-      var cmcdParameters = cmcdModel.getCmcdParametersFromManifest();
-      var cmcdMode = cmcdParameters.mode ? cmcdParameters.mode : settings.get().streaming.cmcd.mode;
-      if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].CMCD_MODE_QUERY) {
-        var additionalQueryParameter = _getAdditionalQueryParameter(request);
-        request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__["default"].addAditionalQueryParameterToUrl(request.url, additionalQueryParameter);
-      } else if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_13__["default"].CMCD_MODE_HEADER) {
-        request.headers = Object.assign(request.headers, cmcdModel.getHeaderParameters(request));
-      }
-    }
+    _updateRequestUrlAndHeadersWithCMCD(request);
 
     // Add queryParams that came from pathway cloning
     if (request.queryParams) {
@@ -23759,7 +24041,35 @@ function HTTPLoader(cfg) {
           value: request.queryParams[key]
         };
       });
-      request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_8__["default"].addAditionalQueryParameterToUrl(request.url, queryParams);
+      request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__["default"].addAditionalQueryParameterToUrl(request.url, queryParams);
+    }
+
+    // Add headers from CommonAccessToken
+    var commonAccessToken = commonAccessTokenController.getCommonAccessTokenForUrl(request.url);
+    if (commonAccessToken) {
+      request.headers[_constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].COMMON_ACCESS_TOKEN_HEADER] = commonAccessToken;
+    }
+  }
+
+  /**
+   * Updates the request url and headers with CMCD data
+   * @param request
+   * @private
+   */
+  function _updateRequestUrlAndHeadersWithCMCD(request) {
+    var _request$mediaInfo;
+    var currentServiceLocation = request === null || request === void 0 ? void 0 : request.serviceLocation;
+    var currentAdaptationSetId = request === null || request === void 0 || (_request$mediaInfo = request.mediaInfo) === null || _request$mediaInfo === void 0 || (_request$mediaInfo = _request$mediaInfo.id) === null || _request$mediaInfo === void 0 ? void 0 : _request$mediaInfo.toString();
+    var isIncludedFilters = clientDataReportingController.isServiceLocationIncluded(request.type, currentServiceLocation) && clientDataReportingController.isAdaptationsIncluded(currentAdaptationSetId);
+    if (isIncludedFilters && cmcdModel.isCmcdEnabled()) {
+      var cmcdParameters = cmcdModel.getCmcdParametersFromManifest();
+      var cmcdMode = cmcdParameters.mode ? cmcdParameters.mode : settings.get().streaming.cmcd.mode;
+      if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].CMCD_MODE_QUERY) {
+        var additionalQueryParameter = _getAdditionalQueryParameter(request);
+        request.url = _core_Utils_js__WEBPACK_IMPORTED_MODULE_7__["default"].addAditionalQueryParameterToUrl(request.url, additionalQueryParameter);
+      } else if (cmcdMode === _constants_Constants_js__WEBPACK_IMPORTED_MODULE_12__["default"].CMCD_MODE_HEADER) {
+        request.headers = Object.assign(request.headers, cmcdModel.getHeaderParameters(request));
+      }
     }
   }
 
@@ -23813,7 +24123,7 @@ function HTTPLoader(cfg) {
       // abort will trigger onloadend which we don't want
       // when deliberately aborting inflight requests -
       // set them to undefined so they are not called
-      reqData.onloadend = reqData.onerror = reqData.onprogress = undefined;
+      reqData.onloadend = reqData.onprogress = undefined;
       if (reqData.abort) {
         reqData.abort();
       }
@@ -23822,7 +24132,8 @@ function HTTPLoader(cfg) {
   }
   instance = {
     load: load,
-    abort: abort
+    abort: abort,
+    setConfig: setConfig
   };
   setup();
   return instance;
@@ -24087,16 +24398,14 @@ function XHRLoader() {
     }
     xhr.withCredentials = httpRequest.credentials === 'include';
     xhr.timeout = httpRequest.timeout;
-    xhr.onload = function (e) {
+    xhr.onload = function () {
       httpResponse.url = this.responseURL;
       httpResponse.status = this.status;
       httpResponse.statusText = this.statusText;
       httpResponse.headers = _core_Utils_js__WEBPACK_IMPORTED_MODULE_1__["default"].parseHttpHeaders(this.getAllResponseHeaders());
       httpResponse.data = this.response;
-      httpRequest.customData.onload(e);
     };
     xhr.onloadend = httpRequest.customData.onloadend;
-    xhr.onerror = httpRequest.customData.onerror;
     xhr.onprogress = httpRequest.customData.onprogress;
     xhr.onabort = httpRequest.customData.onabort;
     xhr.ontimeout = httpRequest.customData.ontimeout;
